@@ -17,3 +17,9 @@ message PlayerReadyResonse {
   }
   repeated ReadyInfo ready_info = 1;
 }
+
+message GameMessageWrap {
+  string battle_id = 1;
+  int32 msgid = 2;
+  bytes data = 3;
+}

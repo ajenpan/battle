@@ -5,10 +5,7 @@ package battle;
 option go_package = "/proto";
 
 service Battle {
-  // rpc CreateBattle(CreateBattleRequest) returns (CreateBattleResponse) {}
   // rpc StartBattle(StartBattleRequest) returns (StartBattleResponse) {}
-  // rpc StopBattle(StopBattleRequest) returns (StopBattleResponse) {}
-  // rpc WatcherJoinBattle(WatcherJoinBattleRequest) returns (WatcherJoinBattleResponse) {}
 }
 
 message GameMessageWrap {
@@ -78,12 +75,9 @@ message BattleOverReport {
 message BattleStatusChangeEvent {
   string battle_id = 1;
   int32 status_before = 2;
-  int32 status_now = 3;  
+  int32 status_now = 3;
 }
 
 message BattleStartEvent {}
 
 message BattleOverEvent {}
-
-
-

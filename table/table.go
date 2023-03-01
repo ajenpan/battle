@@ -16,12 +16,12 @@ import (
 )
 
 type TableOption struct {
-	ID        string
-	Publisher event.Publisher
-	Conf      *pb.CommanderConfigure
+	ID             string
+	EventPublisher event.Publisher
+	Conf           *pb.CommanderConfigure
 }
 
-func NewTable(opt TableOption) *table {
+func NewTable(opt *TableOption) *table {
 	if opt.ID == "" {
 		opt.ID = uuid.NewString()
 	}
@@ -37,7 +37,7 @@ func NewTable(opt TableOption) *table {
 }
 
 type table struct {
-	TableOption
+	*TableOption
 
 	CreateAt time.Time
 	StartAt  time.Time
@@ -239,7 +239,7 @@ func (d *table) GetPlayer(uid int64) *Player {
 func (d *table) PublishEvent(event proto.Message) {
 	log.Infof("PublishEvent: %s: %v", string(proto.MessageName(event)), event)
 
-	if d.Publisher == nil {
+	if d.EventPublisher == nil {
 		return
 	}
 	//TODO:
@@ -247,7 +247,7 @@ func (d *table) PublishEvent(event proto.Message) {
 		Topic:     string(proto.MessageName(event)),
 		Timestamp: time.Now().Unix(),
 	}
-	d.Publisher.Publish(warp)
+	d.EventPublisher.Publish(warp)
 }
 
 func (d *table) OnPlayerMessage(uid int64, topic string, iraw []byte) {
