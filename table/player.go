@@ -1,4 +1,4 @@
-package commander
+package table
 
 import (
 	"fmt"
@@ -36,7 +36,7 @@ func NewPlayers(infos []*pb.PlayerInfo) ([]*Player, error) {
 
 type Player struct {
 	*pb.PlayerInfo
-	// table *Table
+	tableid string
 
 	sender func(msgname string, raw []byte) error
 }

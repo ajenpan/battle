@@ -9,16 +9,16 @@ import (
 type RoleType int
 
 const (
-	RoleType_Player = iota
-	RoleType_Robot  = iota
+	RoleType_Player RoleType = iota
+	RoleType_Robot  RoleType = iota
 )
 
 type GameStatus int16
 
 const (
-	BattleStatus_Idle  = 1
-	BattleStatus_Start = 1
-	BattleStatus_Over  = 1
+	BattleStatus_Idle  GameStatus = iota
+	BattleStatus_Start GameStatus = iota
+	BattleStatus_Over  GameStatus = iota
 )
 
 type Player interface {
@@ -41,6 +41,6 @@ type Logic interface {
 	OnStart() error
 	OnTick(time.Duration)
 	OnReset()
-	OnMessage(p Player, topic string, data []byte)
-	OnEvent(topic string, event proto.Message)
+	OnMessage(p Player, msgid int, data []byte)
+	OnEvent(topic string, data []byte)
 }

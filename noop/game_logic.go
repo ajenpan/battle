@@ -3,8 +3,6 @@ package noop
 import (
 	"time"
 
-	"google.golang.org/protobuf/proto"
-
 	battle "github.com/ajenpan/battle"
 )
 
@@ -30,9 +28,9 @@ func (gl *GameLogic) OnTick(time.Duration) {
 func (gl *GameLogic) OnReset() {
 
 }
-func (gl *GameLogic) OnMessage(battle.Player, string, []byte) {
+func (gl *GameLogic) OnMessage(p battle.Player, msgid int, data []byte) {
 
 }
-func (gl *GameLogic) OnEvent(string, proto.Message) {
+func (gl *GameLogic) OnEvent(topic string, data []byte) {
 
 }

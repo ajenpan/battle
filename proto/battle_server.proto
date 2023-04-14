@@ -8,13 +8,6 @@ service Battle {
   // rpc StartBattle(StartBattleRequest) returns (StartBattleResponse) {}
 }
 
-message GameMessageWrap {
-  string battle_id = 1;
-  int64 uid = 2;
-  int32 msgid = 3;
-  bytes data = 4;
-}
-
 message PlayerInfo {
   int64 uid = 1;
   int32 seat_id = 2;
@@ -22,7 +15,7 @@ message PlayerInfo {
   bool is_robot = 4;
 }
 
-message CommanderConfigure {
+message BattleConfigure {
   int32 max_game_time = 1; // second
 
   oneof start_condition {
@@ -32,15 +25,14 @@ message CommanderConfigure {
 }
 
 message StartBattleRequest {
-  string battle_name = 1;
-  bytes battle_conf = 2;
-  CommanderConfigure commander_conf = 3;
+  string game_name = 1;
+  bytes game_conf = 2;
+  BattleConfigure battle_conf = 3;
   repeated PlayerInfo player_infos = 4;
 }
 
 message StartBattleResponse {
-  string battle_id = 1;
-  string node_id = 2;
+  string battle_id = 1;  
 }
 
 message StopBattleRequest {

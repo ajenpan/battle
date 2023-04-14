@@ -1,4 +1,4 @@
-package commander
+package table
 
 import (
 	"sync"
@@ -18,16 +18,16 @@ import (
 type TableOption struct {
 	ID             string
 	EventPublisher event.Publisher
-	Conf           *pb.CommanderConfigure
+	Conf           *pb.BattleConfigure
 }
 
-func NewTable(opt *TableOption) *table {
+func NewTable(opt TableOption) *Table {
 	if opt.ID == "" {
 		opt.ID = uuid.NewString()
 	}
 
-	ret := &table{
-		TableOption: opt,
+	ret := &Table{
+		TableOption: &opt,
 		CreateAt:    time.Now(),
 	}
 
@@ -36,7 +36,7 @@ func NewTable(opt *TableOption) *table {
 	return ret
 }
 
-type table struct {
+type Table struct {
 	*TableOption
 
 	CreateAt time.Time
@@ -44,8 +44,6 @@ type table struct {
 	OverAt   time.Time
 
 	battle bf.Logic
-
-	IsPlaying bool
 
 	// watchers    sync.Map
 	// evenReport
@@ -60,7 +58,7 @@ type table struct {
 	battleStatus bf.GameStatus
 }
 
-func (d *table) Init(players []*Player, logic bf.Logic, logicConf interface{}) error {
+func (d *Table) Init(logic bf.Logic, players []*Player, logicConf interface{}) error {
 	d.rwlock.Lock()
 	defer d.rwlock.Unlock()
 
@@ -87,7 +85,7 @@ func (d *table) Init(players []*Player, logic bf.Logic, logicConf interface{}) e
 	d.battle = logic
 
 	switch conf := d.Conf.StartCondition.(type) {
-	case *pb.CommanderConfigure_Delayed:
+	case *pb.BattleConfigure_Delayed:
 		if conf.Delayed > 0 {
 			log.Info("start table after %d seconds", conf.Delayed)
 			time.AfterFunc(time.Duration(conf.Delayed)*time.Second, func() {
@@ -100,31 +98,37 @@ func (d *table) Init(players []*Player, logic bf.Logic, logicConf interface{}) e
 	}
 	return nil
 }
-func (d *table) pushAction(f func()) {
+func (d *Table) pushAction(f func()) {
 	d.action <- f
 }
 
-func (d *table) Start() error {
+func (d *Table) Start() error {
 	d.rwlock.Lock()
 	defer d.rwlock.Unlock()
 
-	go func(jobque chan func()) {
-		for job := range jobque {
-			job()
+	go func() {
+		safecall := func(f func()) {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Error("panic: %v", err)
+				}
+			}()
+			f()
 		}
 
-	}(d.action)
+		for job := range d.action {
+			safecall(job)
+		}
+	}()
 
 	if d.ticker != nil {
 		d.ticker.Stop()
 	}
 
 	d.ticker = time.NewTicker(1 * time.Second)
-
 	go func(ticker *time.Ticker) {
 		latest := time.Now()
 		for now := range ticker.C {
-
 			sub := now.Sub(latest)
 			latest = now
 
@@ -139,15 +143,14 @@ func (d *table) Start() error {
 	return d.battle.OnStart()
 }
 
-func (d *table) Close() {
-
+func (d *Table) Close() {
 	if d.ticker != nil {
 		d.ticker.Stop()
 	}
 	close(d.action)
 }
 
-func (d *table) OnReportBattleStatus(s bf.GameStatus) {
+func (d *Table) OnReportBattleStatus(s bf.GameStatus) {
 	if d.battleStatus == s {
 		return
 	}
@@ -161,22 +164,28 @@ func (d *table) OnReportBattleStatus(s bf.GameStatus) {
 		BattleId:     d.ID,
 	}
 	d.PublishEvent(event)
-}
 
-func (d *table) OnReportBattleEvent(topic string, event proto.Message) {
-	log.Infof("OnReportBattleEvent: %s: %v", string(proto.MessageName(event)), event)
-
-	//TODO:
-	warp := &evproto.EventMessage{
-		Topic:     string(proto.MessageName(event)),
-		Timestamp: time.Now().Unix(),
+	switch s {
+	case bf.BattleStatus_Idle:
+	case bf.BattleStatus_Start:
+		d.reportGameStart()
+	case bf.BattleStatus_Over:
+		d.reportGameOver()
 	}
-	// battle event wrap
-	d.PublishEvent(warp)
 }
 
-func (d *table) SendMessage(p bf.Player, msg proto.Message) {
-	rp := p.(*Player)
+func (d *Table) OnReportBattleEvent(topic string, event proto.Message) {
+	d.PublishEvent(event)
+}
+
+func (d *Table) SendMessage(p bf.Player, msg proto.Message) {
+
+	rp, ok := p.(*Player)
+	if !ok {
+		log.Error("player is not Player")
+		return
+	}
+
 	err := rp.SendMessage(msg)
 	if err != nil {
 		log.Error("send message to player: %v, %s: %v", rp.Uid, string(proto.MessageName(msg)), msg)
@@ -185,7 +194,7 @@ func (d *table) SendMessage(p bf.Player, msg proto.Message) {
 	}
 }
 
-func (d *table) BroadcastMessage(msg proto.Message) {
+func (d *Table) BroadcastMessage(msg proto.Message) {
 	msgname := string(proto.MessageName(msg))
 	log.Debugf("BroadcastMessage: %s: %v", msgname, msg)
 
@@ -206,58 +215,55 @@ func (d *table) BroadcastMessage(msg proto.Message) {
 	})
 }
 
-func (d *table) reportGameStart() {
-	if d.IsPlaying {
-		log.Error("table is playing")
-		return
-	}
-	d.IsPlaying = true
-	d.StartAt = time.Now()
+func (d *Table) IsPlaying() bool {
+	return d.battleStatus == bf.BattleStatus_Start
+}
 
+func (d *Table) reportGameStart() {
+	d.StartAt = time.Now()
 	d.PublishEvent(&pb.BattleStartEvent{})
 }
 
-func (d *table) reportGameOver() {
-	if !d.IsPlaying {
-		log.Error("table is not playing")
-		return
-	}
-
-	d.IsPlaying = false
+func (d *Table) reportGameOver() {
 	d.OverAt = time.Now()
-
 	d.PublishEvent(&pb.BattleOverEvent{})
 }
 
-func (d *table) GetPlayer(uid int64) *Player {
+func (d *Table) GetPlayer(uid int64) *Player {
 	if p, has := d.players.Load(uid); has {
 		return p.(*Player)
 	}
 	return nil
 }
 
-func (d *table) PublishEvent(event proto.Message) {
-	log.Infof("PublishEvent: %s: %v", string(proto.MessageName(event)), event)
-
+func (d *Table) PublishEvent(event proto.Message) {
 	if d.EventPublisher == nil {
 		return
 	}
-	//TODO:
+
+	log.Infof("PublishEvent: %s: %v", string(proto.MessageName(event)), event)
+
+	raw, err := proto.Marshal(event)
+	if err != nil {
+		log.Error(err)
+		return
+	}
 	warp := &evproto.EventMessage{
 		Topic:     string(proto.MessageName(event)),
 		Timestamp: time.Now().Unix(),
+		Data:      raw,
 	}
 	d.EventPublisher.Publish(warp)
 }
 
-func (d *table) OnPlayerMessage(uid int64, topic string, iraw []byte) {
+func (d *Table) OnPlayerMessage(uid int64, msgid int, iraw []byte) {
 	// here is not safe
 	// msg := proto.Clone(fmsg).(*pb.BattleMessageWrap)
 
 	d.action <- func() {
 		p := d.GetPlayer(uid)
 		if p != nil && d.battle != nil {
-			d.battle.OnMessage(p, topic, iraw)
+			d.battle.OnMessage(p, msgid, iraw)
 		}
 	}
 }
