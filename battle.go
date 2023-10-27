@@ -16,10 +16,15 @@ const (
 type GameStatus int16
 
 const (
-	BattleStatus_Idle  GameStatus = iota
-	BattleStatus_Start GameStatus = iota
-	BattleStatus_Over  GameStatus = iota
+	BattleStatus_Idle    GameStatus = iota
+	BattleStatus_Started GameStatus = iota
+	BattleStatus_Over    GameStatus = iota
 )
+
+type PlayerMessage struct {
+	Head []byte
+	Body []byte
+}
 
 type Player interface {
 	SeatID() int32
@@ -27,20 +32,23 @@ type Player interface {
 	Role() RoleType
 }
 
+type PlayerStatus struct {
+}
+
 type Table interface {
 	SendMessage(Player, proto.Message)
 	BroadcastMessage(proto.Message)
-
-	OnReportBattleStatus(GameStatus)
-	OnReportBattleEvent(topic string, event proto.Message)
+	ReportBattleStatus(GameStatus)
+	ReportBattleEvent(topic string, event proto.Message)
 }
 
 type Logic interface {
 	OnInit(c Table, conf interface{}) error
-	OnPlayerJoin([]Player) error
+	// OnPlayerConn(p Player, online bool)
+	// OnPlayerJoin([]Player) error
+	// OnPlayerStatusChange(Player, *PlayerStatus)
 	OnStart() error
 	OnTick(time.Duration)
 	OnReset()
-	OnMessage(p Player, msgid int, data []byte)
-	OnEvent(topic string, data []byte)
+	OnPlayerMessage(p Player, msg *PlayerMessage)
 }

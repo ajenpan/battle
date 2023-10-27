@@ -7,18 +7,17 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ajenpan/battle/event"
-	evproto "github.com/ajenpan/battle/event/proto"
-	log "github.com/ajenpan/battle/logger"
+	"github.com/ajenpan/battle"
+	log "github.com/ajenpan/surf/logger"
 
 	bf "github.com/ajenpan/battle"
 	pb "github.com/ajenpan/battle/proto"
 )
 
 type TableOption struct {
-	ID             string
-	EventPublisher event.Publisher
-	Conf           *pb.BattleConfigure
+	ID string
+	// EventPublisher event.Publisher
+	Conf *pb.BattleConfigure
 }
 
 func NewTable(opt TableOption) *Table {
@@ -78,9 +77,9 @@ func (d *Table) Init(logic bf.Logic, players []*Player, logicConf interface{}) e
 		return err
 	}
 
-	if err := logic.OnPlayerJoin(battlePlayers); err != nil {
-		return err
-	}
+	// if err := logic.OnPlayerJoin(battlePlayers); err != nil {
+	// 	return err
+	// }
 
 	d.battle = logic
 
@@ -150,7 +149,7 @@ func (d *Table) Close() {
 	close(d.action)
 }
 
-func (d *Table) OnReportBattleStatus(s bf.GameStatus) {
+func (d *Table) ReportBattleStatus(s bf.GameStatus) {
 	if d.battleStatus == s {
 		return
 	}
@@ -167,14 +166,14 @@ func (d *Table) OnReportBattleStatus(s bf.GameStatus) {
 
 	switch s {
 	case bf.BattleStatus_Idle:
-	case bf.BattleStatus_Start:
+	case bf.BattleStatus_Started:
 		d.reportGameStart()
 	case bf.BattleStatus_Over:
 		d.reportGameOver()
 	}
 }
 
-func (d *Table) OnReportBattleEvent(topic string, event proto.Message) {
+func (d *Table) ReportBattleEvent(topic string, event proto.Message) {
 	d.PublishEvent(event)
 }
 
@@ -216,7 +215,7 @@ func (d *Table) BroadcastMessage(msg proto.Message) {
 }
 
 func (d *Table) IsPlaying() bool {
-	return d.battleStatus == bf.BattleStatus_Start
+	return d.battleStatus == bf.BattleStatus_Started
 }
 
 func (d *Table) reportGameStart() {
@@ -237,33 +236,30 @@ func (d *Table) GetPlayer(uid int64) *Player {
 }
 
 func (d *Table) PublishEvent(event proto.Message) {
-	if d.EventPublisher == nil {
-		return
-	}
+	// if d.EventPublisher == nil {
+	// 	return
+	// }
 
-	log.Infof("PublishEvent: %s: %v", string(proto.MessageName(event)), event)
+	// log.Infof("PublishEvent: %s: %v", string(proto.MessageName(event)), event)
 
-	raw, err := proto.Marshal(event)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-	warp := &evproto.EventMessage{
-		Topic:     string(proto.MessageName(event)),
-		Timestamp: time.Now().Unix(),
-		Data:      raw,
-	}
-	d.EventPublisher.Publish(warp)
+	// raw, err := proto.Marshal(event)
+	// if err != nil {
+	// 	log.Error(err)
+	// 	return
+	// }
+	// warp := &evproto.EventMessage{
+	// 	Topic:     string(proto.MessageName(event)),
+	// 	Timestamp: time.Now().Unix(),
+	// 	Data:      raw,
+	// }
+	// d.EventPublisher.Publish(warp)
 }
 
-func (d *Table) OnPlayerMessage(uid int64, msgid int, iraw []byte) {
-	// here is not safe
-	// msg := proto.Clone(fmsg).(*pb.BattleMessageWrap)
-
+func (d *Table) OnPlayerMessage(uid int64, p *battle.PlayerMessage) {
 	d.action <- func() {
-		p := d.GetPlayer(uid)
-		if p != nil && d.battle != nil {
-			d.battle.OnMessage(p, msgid, iraw)
+		player := d.GetPlayer(uid)
+		if player != nil && d.battle != nil {
+			d.battle.OnPlayerMessage(player, p)
 		}
 	}
 }

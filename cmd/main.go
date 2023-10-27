@@ -9,11 +9,12 @@ import (
 	"github.com/urfave/cli/v2"
 
 	battleHandler "github.com/ajenpan/battle/handler"
-	"github.com/ajenpan/battle/logger"
 	"github.com/ajenpan/battle/proto"
-	"github.com/ajenpan/battle/utils/calltable"
-
-	utilSignal "github.com/ajenpan/battle/utils/signal"
+	"github.com/ajenpan/surf/logger"
+	"github.com/ajenpan/surf/tcp"
+	"github.com/ajenpan/surf/utils/calltable"
+	"github.com/ajenpan/surf/utils/rsagen"
+	utilSignal "github.com/ajenpan/surf/utils/signal"
 )
 
 var (
@@ -37,8 +38,7 @@ func longVersion() string {
 }
 
 func main() {
-	err := Run()
-	if err != nil {
+	if err := Run(); err != nil {
 		fmt.Println(err)
 	}
 }
@@ -50,14 +50,32 @@ func Run() error {
 	app := cli.NewApp()
 	app.Version = Version
 	app.Name = Name
+	app.Action = RealMain
 	err := app.Run(os.Args)
 	return err
 }
 
 func RealMain(c *cli.Context) error {
-	h := battleHandler.New()
+	pk, err := rsagen.LoadRsaPublicKeyFromFile("public.pem")
+	if err != nil {
+		return err
+	}
 
+	h := battleHandler.New()
 	h.CT = calltable.ExtractAsyncMethod(proto.File_proto_battle_client_proto.Messages(), h)
+
+	svr, err := tcp.NewServer(tcp.ServerOptions{
+		Address:   ":12001",
+		OnMessage: h.OnMessage,
+		OnConn:    h.OnConnect,
+		AuthFunc:  tcp.RsaTokenAuth(pk),
+	})
+	if err != nil {
+		return err
+	}
+
+	svr.Start()
+	defer svr.Stop()
 
 	s := utilSignal.WaitShutdown()
 	logger.Infof("recv signal: %v", s.String())

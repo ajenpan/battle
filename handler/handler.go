@@ -6,23 +6,21 @@ import (
 	"sync"
 	"sync/atomic"
 
-	protobuf "google.golang.org/protobuf/proto"
-
-	"github.com/ajenpan/battle/event"
-	"github.com/ajenpan/battle/utils/calltable"
 	"github.com/google/uuid"
+	protobuf "google.golang.org/protobuf/proto"
 
 	battle "github.com/ajenpan/battle"
 	"github.com/ajenpan/battle/proto"
 	"github.com/ajenpan/battle/table"
+	"github.com/ajenpan/surf/tcp"
+	"github.com/ajenpan/surf/utils/calltable"
 )
 
 type Handler struct {
 	battles sync.Map
 
 	LogicCreator *battle.GameLogicCreator
-	CT           *calltable.CallTable
-	Publisher    event.Publisher
+	CT           *calltable.CallTable[string]
 
 	createCounter int32
 }
@@ -52,9 +50,9 @@ func (h *Handler) CreateBattle(ctx context.Context, in *proto.StartBattleRequest
 
 	battleid := uuid.NewString() + fmt.Sprintf("-%d", h.createCounter)
 	d := table.NewTable(table.TableOption{
-		ID:             battleid,
-		Conf:           in.BattleConf,
-		EventPublisher: h.Publisher,
+		ID:   battleid,
+		Conf: in.BattleConf,
+		// EventPublisher: h.Publisher,
 	})
 
 	players, err := table.NewPlayers(in.PlayerInfos)
@@ -93,16 +91,12 @@ func (h *Handler) StopBattle(ctx context.Context, in *proto.StopBattleRequest) (
 	return out, nil
 }
 
-func (h *Handler) OnEvent(topc string, msg protobuf.Message) {
-
-}
-
 func (h *Handler) OnBattleMessageWrap(uid int64, msg *proto.GameMessageWrap) {
 	b := h.getBattleById(msg.BattleId)
 	if b == nil {
 		return
 	}
-	b.OnPlayerMessage(uid, int(msg.Msgid), msg.Data)
+	b.OnPlayerMessage(uid, &battle.PlayerMessage{})
 }
 
 func (h *Handler) getBattleById(battleId string) *table.Table {
@@ -110,4 +104,20 @@ func (h *Handler) getBattleById(battleId string) *table.Table {
 		return raw.(*table.Table)
 	}
 	return nil
+}
+
+func (h *Handler) OnEvent(topc string, msg protobuf.Message) {
+
+}
+
+func (h *Handler) OnMessage(s *tcp.Socket, pkg *tcp.THVPacket) {
+	typ := pkg.GetType()
+	switch typ {
+	case 5:
+	case 6:
+	}
+}
+
+func (h *Handler) OnConnect(s *tcp.Socket, enable bool) {
+
 }

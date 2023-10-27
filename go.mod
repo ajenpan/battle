@@ -1,11 +1,11 @@
 module github.com/ajenpan/battle
 
-go 1.19
+go 1.20
 
 require (
 	github.com/google/uuid v1.3.0
 	github.com/urfave/cli/v2 v2.25.3
-	google.golang.org/protobuf v1.30.0
+	google.golang.org/protobuf v1.31.0
 )
 
 require (
