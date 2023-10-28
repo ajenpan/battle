@@ -27,19 +27,21 @@ type PlayerMessage struct {
 }
 
 type Player interface {
-	SeatID() int32
-	Score() int64
-	Role() RoleType
+	GetSeatID() int32
+	GetScore() int64
+	GetRole() RoleType
+	// GetTableID() string
 }
 
 type PlayerStatus struct {
 }
 
 type Table interface {
-	SendMessage(Player, proto.Message)
-	BroadcastMessage(proto.Message)
+	GetTableID() string
+	SendMessage(Player, *PlayerMessage)
+	BroadcastMessage(*PlayerMessage)
 	ReportBattleStatus(GameStatus)
-	ReportBattleEvent(topic string, event proto.Message)
+	ReportBattleEvent(event proto.Message)
 }
 
 type Logic interface {

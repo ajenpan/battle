@@ -38,33 +38,32 @@ type Player struct {
 	*pb.PlayerInfo
 	tableid string
 
-	sender func(msgname string, raw []byte) error
+	sender func(msg *bf.PlayerMessage) error
 }
 
-func (p *Player) Score() int64 {
+func (p *Player) GetScore() int64 {
 	return p.PlayerInfo.Score
 }
 
-func (p *Player) UserID() int64 {
+func (p *Player) GetTableID() string {
+	return p.tableid
+}
+
+func (p *Player) GetUserID() int64 {
 	return p.PlayerInfo.Uid
 }
 
-func (p *Player) SeatID() int32 {
+func (p *Player) GetSeatID() int32 {
 	return p.PlayerInfo.SeatId
 }
 
-func (p *Player) Role() bf.RoleType {
+func (p *Player) GetRole() bf.RoleType {
 	if p.PlayerInfo.IsRobot {
 		return bf.RoleType_Robot
 	}
 	return bf.RoleType_Player
 }
 
-func (p *Player) SendMessage(protobuf.Message) error {
-
-	return nil
-}
-
-func (p *Player) Send(msgname string, raw []byte) error {
-	return p.sender(msgname, raw)
+func (p *Player) Send(msg *bf.PlayerMessage) error {
+	return p.sender(msg)
 }

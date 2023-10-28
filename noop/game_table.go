@@ -5,24 +5,29 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func NewGameTable() *GameDesk {
-	return &GameDesk{}
+func NewGameTable() *NoopTable {
+	return &NoopTable{}
 }
 
-type GameDesk struct {
+type NoopTable struct {
 }
 
-func (gd *GameDesk) SendMessageToPlayer(battle.Player, proto.Message) {
-
-}
-
-func (gd *GameDesk) BroadcastMessage(proto.Message) {
+func (gd *NoopTable) SendMessage(battle.Player, *battle.PlayerMessage) {
 
 }
 
-func (gd *GameDesk) PublishEvent(proto.Message) {
+func (gd *NoopTable) BroadcastMessage(*battle.PlayerMessage) {
 
 }
 
-func (gd *GameDesk) ReportGameOver() {
+func (gd *NoopTable) ReportBattleEvent(event proto.Message) {
+
+}
+
+func (gd *NoopTable) ReportBattleStatus(battle.GameStatus) {
+
+}
+
+func (gd *NoopTable) GetTableID() string {
+	return ""
 }

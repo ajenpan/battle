@@ -57,6 +57,10 @@ type Table struct {
 	battleStatus bf.GameStatus
 }
 
+func (d *Table) GetTableID() string {
+	return d.TableOption.ID
+}
+
 func (d *Table) Init(logic bf.Logic, players []*Player, logicConf interface{}) error {
 	d.rwlock.Lock()
 	defer d.rwlock.Unlock()
@@ -160,7 +164,7 @@ func (d *Table) ReportBattleStatus(s bf.GameStatus) {
 	event := &pb.BattleStatusChangeEvent{
 		StatusBefore: int32(statusBefore),
 		StatusNow:    int32(s),
-		BattleId:     d.ID,
+		BattleId:     string(d.GetTableID()),
 	}
 	d.PublishEvent(event)
 
@@ -173,39 +177,26 @@ func (d *Table) ReportBattleStatus(s bf.GameStatus) {
 	}
 }
 
-func (d *Table) ReportBattleEvent(topic string, event proto.Message) {
+func (d *Table) ReportBattleEvent(event proto.Message) {
 	d.PublishEvent(event)
 }
 
-func (d *Table) SendMessage(p bf.Player, msg proto.Message) {
-
+func (d *Table) SendMessage(p bf.Player, msg *bf.PlayerMessage) {
 	rp, ok := p.(*Player)
 	if !ok {
 		log.Error("player is not Player")
 		return
 	}
-
-	err := rp.SendMessage(msg)
+	err := rp.Send(msg)
 	if err != nil {
-		log.Error("send message to player: %v, %s: %v", rp.Uid, string(proto.MessageName(msg)), msg)
-	} else {
-		log.Debug("send message to player: %v, %s: %v", rp.Uid, string(proto.MessageName(msg)), msg)
+		log.Error(err)
 	}
 }
 
-func (d *Table) BroadcastMessage(msg proto.Message) {
-	msgname := string(proto.MessageName(msg))
-	log.Debugf("BroadcastMessage: %s: %v", msgname, msg)
-
-	raw, err := proto.Marshal(msg)
-	if err != nil {
-		log.Error(err)
-		return
-	}
-
+func (d *Table) BroadcastMessage(msg *bf.PlayerMessage) {
 	d.players.Range(func(key, value interface{}) bool {
 		if p, ok := value.(*Player); ok && p != nil {
-			err := p.Send(msgname, raw)
+			err := p.Send(msg)
 			if err != nil {
 				log.Error(err)
 			}

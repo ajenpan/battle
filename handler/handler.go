@@ -73,7 +73,7 @@ func (h *Handler) CreateBattle(ctx context.Context, in *proto.StartBattleRequest
 	h.battles.Store(battleid, d)
 
 	out := &proto.StartBattleResponse{
-		BattleId: d.ID,
+		BattleId: d.GetTableID(),
 	}
 	return out, nil
 }
