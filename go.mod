@@ -1,4 +1,4 @@
-module github.com/ajenpan/battle
+module github.com/ajenpan/battlefield
 
 go 1.20
 

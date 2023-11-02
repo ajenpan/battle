@@ -1,7 +1,7 @@
 package noop
 
 import (
-	battle "github.com/ajenpan/battle"
+	battle "github.com/ajenpan/battlefield"
 	protobuf "google.golang.org/protobuf/proto"
 )
 

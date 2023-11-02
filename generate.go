@@ -1,3 +1,3 @@
-package battle
+package battlefield
 
-//go:generate protoc --go_out=. proto/*.proto
+//go:generate protoc --go_out=. messages/*.proto

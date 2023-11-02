@@ -8,11 +8,9 @@ import (
 
 	"github.com/urfave/cli/v2"
 
-	battleHandler "github.com/ajenpan/battle/handler"
-	"github.com/ajenpan/battle/proto"
+	bfh "github.com/ajenpan/battlefield/handler"
 	"github.com/ajenpan/surf/logger"
 	"github.com/ajenpan/surf/tcp"
-	"github.com/ajenpan/surf/utils/calltable"
 	"github.com/ajenpan/surf/utils/rsagen"
 	utilSignal "github.com/ajenpan/surf/utils/signal"
 )
@@ -61,8 +59,7 @@ func RealMain(c *cli.Context) error {
 		return err
 	}
 
-	h := battleHandler.New()
-	h.CT = calltable.ExtractAsyncMethod(proto.File_proto_battle_client_proto.Messages(), h)
+	h := bfh.New()
 
 	svr, err := tcp.NewServer(tcp.ServerOptions{
 		Address:   ":12001",

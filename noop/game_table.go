@@ -1,7 +1,7 @@
 package noop
 
 import (
-	battle "github.com/ajenpan/battle"
+	battle "github.com/ajenpan/battlefield"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -12,11 +12,11 @@ func NewGameTable() *NoopTable {
 type NoopTable struct {
 }
 
-func (gd *NoopTable) SendMessage(battle.Player, *battle.PlayerMessage) {
+func (gd *NoopTable) SendPlayerMessage(battle.Player, *battle.PlayerMessage) {
 
 }
 
-func (gd *NoopTable) BroadcastMessage(*battle.PlayerMessage) {
+func (gd *NoopTable) BroadcastPlayerMessage(*battle.PlayerMessage) {
 
 }
 

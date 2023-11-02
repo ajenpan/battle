@@ -7,17 +7,17 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ajenpan/battle"
 	log "github.com/ajenpan/surf/logger"
 
-	bf "github.com/ajenpan/battle"
-	pb "github.com/ajenpan/battle/proto"
+	bf "github.com/ajenpan/battlefield"
+	pb "github.com/ajenpan/battlefield/messages"
 )
 
 type TableOption struct {
 	ID string
 	// EventPublisher event.Publisher
-	Conf *pb.BattleConfigure
+	Conf *pb.TableConfig
+	// Closer func(battleid string) error
 }
 
 func NewTable(opt TableOption) *Table {
@@ -42,7 +42,7 @@ type Table struct {
 	StartAt  time.Time
 	OverAt   time.Time
 
-	battle bf.Logic
+	logic bf.Logic
 
 	// watchers    sync.Map
 	// evenReport
@@ -57,16 +57,16 @@ type Table struct {
 	battleStatus bf.GameStatus
 }
 
-func (d *Table) GetTableID() string {
+func (d *Table) GetID() string {
 	return d.TableOption.ID
 }
 
-func (d *Table) Init(logic bf.Logic, players []*Player, logicConf interface{}) error {
+func (d *Table) Init(players []*Player, logic bf.Logic, logicConf interface{}) error {
 	d.rwlock.Lock()
 	defer d.rwlock.Unlock()
 
-	if d.battle != nil {
-		d.battle.OnReset()
+	if d.logic != nil {
+		d.logic.OnReset()
 	}
 
 	battlePlayers := make([]bf.Player, len(players))
@@ -85,24 +85,29 @@ func (d *Table) Init(logic bf.Logic, players []*Player, logicConf interface{}) e
 	// 	return err
 	// }
 
-	d.battle = logic
+	d.logic = logic
 
-	switch conf := d.Conf.StartCondition.(type) {
-	case *pb.BattleConfigure_Delayed:
-		if conf.Delayed > 0 {
-			log.Info("start table after %d seconds", conf.Delayed)
-			time.AfterFunc(time.Duration(conf.Delayed)*time.Second, func() {
-				err := d.Start()
-				if err != nil {
-					log.Error(err)
-				}
-			})
-		}
-	}
+	// switch conf := d.Conf.StartCondition.(type) {
+	// case *pb.BattleConfigure_Delayed:
+	// 	if conf.Delayed > 0 {
+	// 		log.Info("start table after %d seconds", conf.Delayed)
+	// 		time.AfterFunc(time.Duration(conf.Delayed)*time.Second, func() {
+	// 			err := d.Start()
+	// 			if err != nil {
+	// 				log.Error(err)
+	// 			}
+	// 		})
+	// 	}
+	// }
 	return nil
 }
-func (d *Table) pushAction(f func()) {
+
+func (d *Table) PushAction(f func()) {
 	d.action <- f
+}
+
+func (d *Table) SetPlayerStatus() {
+
 }
 
 func (d *Table) Start() error {
@@ -113,7 +118,7 @@ func (d *Table) Start() error {
 		safecall := func(f func()) {
 			defer func() {
 				if err := recover(); err != nil {
-					log.Error("panic: %v", err)
+					log.Errorf("panic: %v", err)
 				}
 			}()
 			f()
@@ -135,15 +140,15 @@ func (d *Table) Start() error {
 			sub := now.Sub(latest)
 			latest = now
 
-			d.pushAction(func() {
-				if d.battle != nil {
-					d.battle.OnTick(sub)
+			d.PushAction(func() {
+				if d.logic != nil {
+					d.logic.OnTick(sub)
 				}
 			})
 		}
 	}(d.ticker)
 
-	return d.battle.OnStart()
+	return d.logic.OnStart()
 }
 
 func (d *Table) Close() {
@@ -164,7 +169,7 @@ func (d *Table) ReportBattleStatus(s bf.GameStatus) {
 	event := &pb.BattleStatusChangeEvent{
 		StatusBefore: int32(statusBefore),
 		StatusNow:    int32(s),
-		BattleId:     string(d.GetTableID()),
+		BattleId:     string(d.GetID()),
 	}
 	d.PublishEvent(event)
 
@@ -181,7 +186,7 @@ func (d *Table) ReportBattleEvent(event proto.Message) {
 	d.PublishEvent(event)
 }
 
-func (d *Table) SendMessage(p bf.Player, msg *bf.PlayerMessage) {
+func (d *Table) SendPlayerMessage(p bf.Player, msg *bf.PlayerMessage) {
 	rp, ok := p.(*Player)
 	if !ok {
 		log.Error("player is not Player")
@@ -193,7 +198,7 @@ func (d *Table) SendMessage(p bf.Player, msg *bf.PlayerMessage) {
 	}
 }
 
-func (d *Table) BroadcastMessage(msg *bf.PlayerMessage) {
+func (d *Table) BroadcastPlayerMessage(msg *bf.PlayerMessage) {
 	d.players.Range(func(key, value interface{}) bool {
 		if p, ok := value.(*Player); ok && p != nil {
 			err := p.Send(msg)
@@ -219,11 +224,50 @@ func (d *Table) reportGameOver() {
 	d.PublishEvent(&pb.BattleOverEvent{})
 }
 
-func (d *Table) GetPlayer(uid int64) *Player {
+func (d *Table) GetPlayer(uid uint64) *Player {
 	if p, has := d.players.Load(uid); has {
 		return p.(*Player)
 	}
 	return nil
+}
+
+func (d *Table) OnPlayerJoin(uid uint64, status int32) {
+	d.PushAction(func() {
+		player := d.GetPlayer(uid)
+		if player == nil {
+			return
+		}
+		player.joined = true
+		player.online = true
+		d.onPlayerStatusChange(player)
+	})
+}
+
+func (d *Table) OnPlayerQuit(uid uint64) {
+	d.PushAction(func() {
+		player := d.GetPlayer(uid)
+		if player == nil {
+			return
+		}
+		player.joined = false
+		player.online = false
+		d.onPlayerStatusChange(player)
+	})
+}
+
+func (d *Table) OnPlayerDisconn(uid uint64) {
+	d.PushAction(func() {
+		player := d.GetPlayer(uid)
+		if player == nil {
+			return
+		}
+		player.online = false
+		d.onPlayerStatusChange(player)
+	})
+}
+
+func (d *Table) onPlayerStatusChange(p *Player) {
+	d.logic.OnPlayerStatus(p)
 }
 
 func (d *Table) PublishEvent(event proto.Message) {
@@ -246,11 +290,11 @@ func (d *Table) PublishEvent(event proto.Message) {
 	// d.EventPublisher.Publish(warp)
 }
 
-func (d *Table) OnPlayerMessage(uid int64, p *battle.PlayerMessage) {
+func (d *Table) OnPlayerMessage(uid uint64, p *bf.PlayerMessage) {
 	d.action <- func() {
 		player := d.GetPlayer(uid)
-		if player != nil && d.battle != nil {
-			d.battle.OnPlayerMessage(player, p)
+		if player != nil && d.logic != nil {
+			d.logic.OnPlayerMessage(player, p)
 		}
 	}
 }

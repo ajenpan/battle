@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -9,39 +8,37 @@ import (
 	"github.com/google/uuid"
 	protobuf "google.golang.org/protobuf/proto"
 
-	battle "github.com/ajenpan/battle"
-	"github.com/ajenpan/battle/proto"
-	"github.com/ajenpan/battle/table"
+	bf "github.com/ajenpan/battlefield"
+	proto "github.com/ajenpan/battlefield/messages"
+	"github.com/ajenpan/battlefield/table"
 	"github.com/ajenpan/surf/tcp"
 	"github.com/ajenpan/surf/utils/calltable"
 )
 
 type Handler struct {
-	battles sync.Map
+	battles        sync.Map
+	player2Battles *Player2Battles
 
-	LogicCreator *battle.GameLogicCreator
-	CT           *calltable.CallTable[string]
-
+	Creator       *bf.LogicCreator
+	CT            *calltable.CallTable[string]
 	createCounter int32
 }
 
 func New() *Handler {
 	h := &Handler{
-		LogicCreator: &battle.GameLogicCreator{},
+		Creator: bf.DefaultLoigcCreator,
 	}
-
-	ct := calltable.ExtractProtoFile(proto.File_proto_battle_client_proto, h)
+	ct := calltable.ExtractProtoFile(proto.File_messages_battle_proto, h)
 	h.CT = ct
-
 	return h
 }
 
-func (h *Handler) CreateBattle(ctx context.Context, in *proto.StartBattleRequest) (*proto.StartBattleResponse, error) {
+func (h *Handler) StartBattle(s *tcp.Socket, in *proto.StartBattleRequest) (*proto.StartBattleResponse, error) {
 	if len(in.PlayerInfos) == 0 {
 		return nil, fmt.Errorf("player info is empty")
 	}
 
-	logic, err := h.LogicCreator.CreateLogic(in.GameName)
+	logic, err := h.Creator.CreateLogic(string(in.BattleName))
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +48,7 @@ func (h *Handler) CreateBattle(ctx context.Context, in *proto.StartBattleRequest
 	battleid := uuid.NewString() + fmt.Sprintf("-%d", h.createCounter)
 	d := table.NewTable(table.TableOption{
 		ID:   battleid,
-		Conf: in.BattleConf,
+		Conf: in.TableConf,
 		// EventPublisher: h.Publisher,
 	})
 
@@ -60,7 +57,7 @@ func (h *Handler) CreateBattle(ctx context.Context, in *proto.StartBattleRequest
 		return nil, err
 	}
 
-	err = d.Init(logic, players, in.BattleConf)
+	err = d.Init(players, logic, in.BattleConf)
 	if err != nil {
 		return nil, err
 	}
@@ -73,12 +70,12 @@ func (h *Handler) CreateBattle(ctx context.Context, in *proto.StartBattleRequest
 	h.battles.Store(battleid, d)
 
 	out := &proto.StartBattleResponse{
-		BattleId: d.GetTableID(),
+		BattleId: d.GetID(),
 	}
 	return out, nil
 }
 
-func (h *Handler) StopBattle(ctx context.Context, in *proto.StopBattleRequest) (*proto.StopBattleResponse, error) {
+func (h *Handler) StopBattle(s *tcp.Socket, in *proto.StopBattleRequest) (*proto.StopBattleResponse, error) {
 	out := &proto.StopBattleResponse{}
 
 	d := h.getBattleById(in.BattleId)
@@ -91,12 +88,39 @@ func (h *Handler) StopBattle(ctx context.Context, in *proto.StopBattleRequest) (
 	return out, nil
 }
 
-func (h *Handler) OnBattleMessageWrap(uid int64, msg *proto.GameMessageWrap) {
+func (h *Handler) PlayerJoinBattle(s *tcp.Socket, in *proto.PlayerJoinBattleRequest) (*proto.PlayerJoinBattleResonse, error) {
+	b := h.getBattleById(in.BattleId)
+	if b == nil {
+		return nil, fmt.Errorf("battle not found")
+	}
+	b.OnPlayerJoin((s.UId), in.ReadyState)
+
+	h.player2Battles.AddPlayerBattle(s.UID(), in.BattleId)
+	return nil, nil
+}
+
+func (h *Handler) PlayerQuitBattle(s *tcp.Socket, in *proto.PlayerQuitBattleRequest) (*proto.PlayerQuitBattleResponse, error) {
+	b := h.getBattleById(in.BattleId)
+	if b == nil {
+		return nil, fmt.Errorf("battle not found")
+	}
+	b.OnPlayerQuit(s.UID())
+
+	h.player2Battles.RemovePlayerBattle(s.UID(), in.BattleId)
+
+	return nil, nil
+}
+
+func (h *Handler) OnBattlePlayerMessageWrap(s *tcp.Socket, msg *proto.BattlePlayerMessageWrap) {
+	uid := (s.UID())
 	b := h.getBattleById(msg.BattleId)
 	if b == nil {
 		return
 	}
-	b.OnPlayerMessage(uid, &battle.PlayerMessage{})
+	b.OnPlayerMessage(uid, &bf.PlayerMessage{
+		Head: msg.Head,
+		Body: msg.Body,
+	})
 }
 
 func (h *Handler) getBattleById(battleId string) *table.Table {
@@ -111,13 +135,24 @@ func (h *Handler) OnEvent(topc string, msg protobuf.Message) {
 }
 
 func (h *Handler) OnMessage(s *tcp.Socket, pkg *tcp.THVPacket) {
-	typ := pkg.GetType()
-	switch typ {
-	case 5:
-	case 6:
-	}
+
 }
 
 func (h *Handler) OnConnect(s *tcp.Socket, enable bool) {
+	if !enable {
+		battles := h.player2Battles.GetPlayerBattle(s.UID())
+		if battles == nil {
+			return
+		}
 
+		battles.Range(func(battleid string, info *PlayerBattleInfo) {
+			b := h.getBattleById(battleid)
+			if b == nil {
+				return
+			}
+			b.OnPlayerDisconn(s.UID())
+		})
+
+		h.player2Battles.DeletePlayerBattle(s.UID())
+	}
 }
