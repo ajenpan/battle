@@ -22,7 +22,7 @@ func (pb *Player2Battles) storePlayerBattle(uid uint64, info *PlayerBattles) *Pl
 	pb.player2battles[uid] = info
 	return info
 }
-func (pb *Player2Battles) DeletePlayerBattle(uid uint64) {
+func (pb *Player2Battles) deletePlayerBattle(uid uint64) {
 	pb.rwlock.Lock()
 	defer pb.rwlock.Unlock()
 	delete(pb.player2battles, uid)
@@ -46,7 +46,7 @@ func (pb *Player2Battles) RemovePlayerBattle(uid uint64, battleid string) {
 	if infos != nil {
 		infos.QuitBattle(battleid)
 		if infos.Size() == 0 {
-			pb.DeletePlayerBattle(uid)
+			pb.deletePlayerBattle(uid)
 		}
 	}
 }

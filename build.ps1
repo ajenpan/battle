@@ -1,5 +1,5 @@
 go env -w GOOS="linux"
-go build -o battle ./cmd
+go build -o battlefield ./cmd
 
 go env -w GOOS="windows"
-go build -o battle.exe ./cmd
+go build -o battlefield.exe ./cmd

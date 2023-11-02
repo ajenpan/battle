@@ -62,7 +62,7 @@ func RealMain(c *cli.Context) error {
 	h := bfh.New()
 
 	svr, err := tcp.NewServer(tcp.ServerOptions{
-		Address:   ":12001",
+		Address:   ":12002",
 		OnMessage: h.OnMessage,
 		OnConn:    h.OnConnect,
 		AuthFunc:  tcp.RsaTokenAuth(pk),

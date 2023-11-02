@@ -8,15 +8,16 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	log "github.com/ajenpan/surf/logger"
+	"github.com/ajenpan/surf/tcp"
 
 	bf "github.com/ajenpan/battlefield"
-	pb "github.com/ajenpan/battlefield/messages"
+	pb "github.com/ajenpan/battlefield/msg"
 )
 
 type TableOption struct {
 	ID string
 	// EventPublisher event.Publisher
-	Conf *pb.TableConfig
+	Conf *pb.BattleConfig
 	// Closer func(battleid string) error
 }
 
@@ -54,7 +55,7 @@ type Table struct {
 
 	ticker *time.Ticker
 
-	battleStatus bf.GameStatus
+	battleStatus bf.BattleStatus
 }
 
 func (d *Table) GetID() string {
@@ -158,7 +159,7 @@ func (d *Table) Close() {
 	close(d.action)
 }
 
-func (d *Table) ReportBattleStatus(s bf.GameStatus) {
+func (d *Table) ReportBattleStatus(s bf.BattleStatus) {
 	if d.battleStatus == s {
 		return
 	}
@@ -166,7 +167,7 @@ func (d *Table) ReportBattleStatus(s bf.GameStatus) {
 	statusBefore := d.battleStatus
 	d.battleStatus = s
 
-	event := &pb.BattleStatusChangeEvent{
+	event := &pb.EventBattleStatusChange{
 		StatusBefore: int32(statusBefore),
 		StatusNow:    int32(s),
 		BattleId:     string(d.GetID()),
@@ -216,12 +217,12 @@ func (d *Table) IsPlaying() bool {
 
 func (d *Table) reportGameStart() {
 	d.StartAt = time.Now()
-	d.PublishEvent(&pb.BattleStartEvent{})
+	d.PublishEvent(&pb.EventBattleStart{})
 }
 
 func (d *Table) reportGameOver() {
 	d.OverAt = time.Now()
-	d.PublishEvent(&pb.BattleOverEvent{})
+	d.PublishEvent(&pb.EventBattleOver{})
 }
 
 func (d *Table) GetPlayer(uid uint64) *Player {
@@ -231,13 +232,13 @@ func (d *Table) GetPlayer(uid uint64) *Player {
 	return nil
 }
 
-func (d *Table) OnPlayerJoin(uid uint64, status int32) {
+func (d *Table) OnPlayerJoin(uid uint64, s *tcp.Socket) {
 	d.PushAction(func() {
 		player := d.GetPlayer(uid)
 		if player == nil {
 			return
 		}
-		player.joined = true
+		player.socket = s
 		player.online = true
 		d.onPlayerStatusChange(player)
 	})
@@ -249,21 +250,14 @@ func (d *Table) OnPlayerQuit(uid uint64) {
 		if player == nil {
 			return
 		}
-		player.joined = false
 		player.online = false
+		player.socket = nil
 		d.onPlayerStatusChange(player)
 	})
 }
 
 func (d *Table) OnPlayerDisconn(uid uint64) {
-	d.PushAction(func() {
-		player := d.GetPlayer(uid)
-		if player == nil {
-			return
-		}
-		player.online = false
-		d.onPlayerStatusChange(player)
-	})
+	d.OnPlayerQuit(uid)
 }
 
 func (d *Table) onPlayerStatusChange(p *Player) {

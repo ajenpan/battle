@@ -13,12 +13,12 @@ const (
 	RoleType_Robot  RoleType = iota
 )
 
-type GameStatus int16
+type BattleStatus int16
 
 const (
-	BattleStatus_Idle    GameStatus = iota
-	BattleStatus_Started GameStatus = iota
-	BattleStatus_Over    GameStatus = iota
+	BattleStatus_Idle    BattleStatus = iota
+	BattleStatus_Started BattleStatus = iota
+	BattleStatus_Over    BattleStatus = iota
 )
 
 type PlayerMessage struct {
@@ -28,7 +28,6 @@ type PlayerMessage struct {
 
 type PlayerStatus interface {
 	IsOnline() bool
-	IsJoined() bool
 }
 
 type PlayerBattleInfo interface {
@@ -49,7 +48,7 @@ type Battle interface {
 	SendPlayerMessage(Player, *PlayerMessage)
 	BroadcastPlayerMessage(*PlayerMessage)
 
-	ReportBattleStatus(GameStatus)
+	ReportBattleStatus(BattleStatus)
 	ReportBattleEvent(event proto.Message)
 }
 

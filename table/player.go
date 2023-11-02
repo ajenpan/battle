@@ -5,8 +5,10 @@ import (
 
 	protobuf "google.golang.org/protobuf/proto"
 
+	"github.com/ajenpan/surf/tcp"
+
 	bf "github.com/ajenpan/battlefield"
-	pb "github.com/ajenpan/battlefield/messages"
+	pb "github.com/ajenpan/battlefield/msg"
 )
 
 func NewPlayer(p *pb.PlayerInfo) *Player {
@@ -36,20 +38,16 @@ func NewPlayers(infos []*pb.PlayerInfo) ([]*Player, error) {
 
 type playerStatus struct {
 	online bool
-	joined bool
 }
 
 func (ps *playerStatus) IsOnline() bool {
 	return ps.online
 }
-func (ps *playerStatus) IsJoined() bool {
-	return ps.joined
-}
 
 type Player struct {
 	*pb.PlayerInfo
 	*playerStatus
-
+	socket   *tcp.Socket
 	battleid string
 	sender   func(msg *bf.PlayerMessage) error
 }
