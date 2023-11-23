@@ -21,8 +21,8 @@ func (c *LogicCreator) Add(name string, creator func() Logic) error {
 	return nil
 }
 
-func (c *LogicCreator) CreateLogic(name string) (Logic, error) {
-	v, has := c.Store.Load(name)
+func (c *LogicCreator) CreateLogic(name string, version string) (Logic, error) {
+	v, has := c.Store.Load(strings.Join([]string{name, version}, "-"))
 	if !has {
 		return nil, fmt.Errorf("game logic %s not found", name)
 	}

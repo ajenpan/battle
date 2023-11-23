@@ -13,12 +13,12 @@ const (
 	RoleType_Robot  RoleType = iota
 )
 
-type BattleStatus int16
+type GameStatus int16
 
 const (
-	BattleStatus_Idle    BattleStatus = iota
-	BattleStatus_Started BattleStatus = iota
-	BattleStatus_Over    BattleStatus = iota
+	GameStatus_Idle    GameStatus = iota
+	GameStatus_Started GameStatus = iota
+	GameStatus_Over    GameStatus = iota
 )
 
 type PlayerMessage struct {
@@ -43,17 +43,18 @@ type Player interface {
 	PlayerBattleInfo
 }
 
-type Battle interface {
-	GetID() string
+type Table interface {
+	GetID() uint64
 	SendPlayerMessage(Player, *PlayerMessage)
 	BroadcastPlayerMessage(*PlayerMessage)
 
-	ReportBattleStatus(BattleStatus)
+	ReportBattleStatus(GameStatus)
 	ReportBattleEvent(event proto.Message)
 }
 
 type Logic interface {
-	OnInit(c Battle, conf interface{}) error
+	OnInit(c Table, players []Player, conf interface{}) error
+
 	OnStart() error
 	OnTick(time.Duration)
 	OnReset()

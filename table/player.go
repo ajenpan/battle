@@ -5,16 +5,15 @@ import (
 
 	protobuf "google.golang.org/protobuf/proto"
 
-	"github.com/ajenpan/surf/tcp"
-
 	bf "github.com/ajenpan/battlefield"
 	pb "github.com/ajenpan/battlefield/msg"
 )
 
 func NewPlayer(p *pb.PlayerInfo) *Player {
-	return &Player{
+	ret := &Player{
 		PlayerInfo: protobuf.Clone(p).(*pb.PlayerInfo),
 	}
+	return ret
 }
 
 func NewPlayers(infos []*pb.PlayerInfo) ([]*Player, error) {
@@ -46,8 +45,7 @@ func (ps *playerStatus) IsOnline() bool {
 
 type Player struct {
 	*pb.PlayerInfo
-	*playerStatus
-	socket   *tcp.Socket
+	playerStatus
 	battleid string
 	sender   func(msg *bf.PlayerMessage) error
 }
@@ -73,5 +71,8 @@ func (p *Player) GetRole() int32 {
 }
 
 func (p *Player) Send(msg *bf.PlayerMessage) error {
+	if p.sender == nil {
+		return fmt.Errorf("sender is nil")
+	}
 	return p.sender(msg)
 }

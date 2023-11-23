@@ -28,7 +28,7 @@ func (pb *Player2Battles) deletePlayerBattle(uid uint64) {
 	delete(pb.player2battles, uid)
 }
 
-func (pb *Player2Battles) AddPlayerBattle(uid uint64, battleid string) {
+func (pb *Player2Battles) AddPlayerBattle(uid uint64, battleid uint64) {
 	infos := pb.GetPlayerBattle(uid)
 	if infos != nil {
 		infos.JoinBattle(battleid)
@@ -41,7 +41,7 @@ func (pb *Player2Battles) AddPlayerBattle(uid uint64, battleid string) {
 	}
 }
 
-func (pb *Player2Battles) RemovePlayerBattle(uid uint64, battleid string) {
+func (pb *Player2Battles) RemovePlayerBattle(uid uint64, battleid uint64) {
 	infos := pb.GetPlayerBattle(uid)
 	if infos != nil {
 		infos.QuitBattle(battleid)
@@ -55,25 +55,25 @@ type PlayerBattleInfo struct {
 }
 
 type PlayerBattles struct {
-	battles map[string]*PlayerBattleInfo
+	battles map[uint64]*PlayerBattleInfo
 	rwlock  sync.RWMutex
 }
 
-func (p *PlayerBattles) Range(f func(battleid string, info *PlayerBattleInfo)) {
+func (p *PlayerBattles) Range(f func(battleid uint64, info *PlayerBattleInfo)) {
 	p.rwlock.RLock()
 	defer p.rwlock.RUnlock()
 	for k, v := range p.battles {
 		f(k, v)
 	}
 }
-func (p *PlayerBattles) JoinBattle(battleid string) {
+func (p *PlayerBattles) JoinBattle(battleid uint64) {
 	p.rwlock.Lock()
 	defer p.rwlock.Unlock()
 
 	p.battles[battleid] = &PlayerBattleInfo{}
 }
 
-func (p *PlayerBattles) QuitBattle(battleid string) {
+func (p *PlayerBattles) QuitBattle(battleid uint64) {
 	p.rwlock.Lock()
 	defer p.rwlock.Unlock()
 

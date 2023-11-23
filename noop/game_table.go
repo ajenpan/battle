@@ -12,9 +12,10 @@ func NewGameTable() *NoopTable {
 type NoopTable struct {
 }
 
-func (gd *NoopTable) GetID() string {
-	return ""
+func (gd *NoopTable) GetID() uint64 {
+	return 0
 }
+
 func (gd *NoopTable) SendPlayerMessage(battle.Player, *battle.PlayerMessage) {
 
 }
@@ -27,7 +28,7 @@ func (gd *NoopTable) ReportBattleEvent(event proto.Message) {
 
 }
 
-func (gd *NoopTable) ReportBattleStatus(battle.BattleStatus) {
+func (gd *NoopTable) ReportBattleStatus(battle.GameStatus) {
 
 }
 

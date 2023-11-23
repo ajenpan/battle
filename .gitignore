@@ -1,12 +1,8 @@
-/bin
+bin
 logs
 log.txt
 *.log
 *.db
 *.exe
-/tools/protoc
-/tools/gormt
-/plugins
 *.pem
-*.pb.go
-/.vscode
+.vscode

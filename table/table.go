@@ -1,37 +1,35 @@
 package table
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 
-	log "github.com/ajenpan/surf/logger"
-	"github.com/ajenpan/surf/tcp"
-
 	bf "github.com/ajenpan/battlefield"
-	pb "github.com/ajenpan/battlefield/msg"
+	"github.com/ajenpan/battlefield/msg"
+	log "github.com/ajenpan/surf/logger"
 )
 
 type TableOption struct {
-	ID string
-	// EventPublisher event.Publisher
-	Conf *pb.BattleConfig
-	// Closer func(battleid string) error
+	ID     uint64
+	Conf   *msg.BattleConfig
+	Closer func()
 }
 
 func NewTable(opt TableOption) *Table {
-	if opt.ID == "" {
-		opt.ID = uuid.NewString()
-	}
-
 	ret := &Table{
 		TableOption: &opt,
 		CreateAt:    time.Now(),
+		closed:      make(chan struct{}),
 	}
 
 	ret.action = make(chan func(), 100)
+
+	if ret.Conf.MaxBattleTime == 0 {
+		ret.Conf.MaxBattleTime = 300
+	}
 
 	return ret
 }
@@ -42,29 +40,33 @@ type Table struct {
 	CreateAt time.Time
 	StartAt  time.Time
 	OverAt   time.Time
+	Age      time.Duration
 
 	logic bf.Logic
 
 	// watchers    sync.Map
 	// evenReport
 
-	rwlock  sync.RWMutex
-	players sync.Map
+	playersRWL sync.RWMutex
+	players    map[uint64]*Player
 
 	action chan func()
+	closed chan struct{}
 
 	ticker *time.Ticker
 
-	battleStatus bf.BattleStatus
+	status bf.GameStatus
+
+	readycnt int
 }
 
-func (d *Table) GetID() string {
+func (d *Table) GetID() uint64 {
 	return d.TableOption.ID
 }
 
 func (d *Table) Init(players []*Player, logic bf.Logic, logicConf interface{}) error {
-	d.rwlock.Lock()
-	defer d.rwlock.Unlock()
+	d.playersRWL.Lock()
+	defer d.playersRWL.Unlock()
 
 	if d.logic != nil {
 		d.logic.OnReset()
@@ -73,33 +75,17 @@ func (d *Table) Init(players []*Player, logic bf.Logic, logicConf interface{}) e
 	battlePlayers := make([]bf.Player, len(players))
 	for i, p := range players {
 		// store player
-		d.players.Store(p.Uid, p)
+		// d.players.Store(p.Uid, p)
 
+		d.players[p.Uid] = p
 		battlePlayers[i] = p
 	}
 
-	if err := logic.OnInit(d, logicConf); err != nil {
+	if err := logic.OnInit(d, battlePlayers, logicConf); err != nil {
 		return err
 	}
 
-	// if err := logic.OnPlayerJoin(battlePlayers); err != nil {
-	// 	return err
-	// }
-
 	d.logic = logic
-
-	// switch conf := d.Conf.StartCondition.(type) {
-	// case *pb.BattleConfigure_Delayed:
-	// 	if conf.Delayed > 0 {
-	// 		log.Info("start table after %d seconds", conf.Delayed)
-	// 		time.AfterFunc(time.Duration(conf.Delayed)*time.Second, func() {
-	// 			err := d.Start()
-	// 			if err != nil {
-	// 				log.Error(err)
-	// 			}
-	// 		})
-	// 	}
-	// }
 	return nil
 }
 
@@ -107,13 +93,22 @@ func (d *Table) PushAction(f func()) {
 	d.action <- f
 }
 
-func (d *Table) SetPlayerStatus() {
-
-}
-
 func (d *Table) Start() error {
-	d.rwlock.Lock()
-	defer d.rwlock.Unlock()
+	d.playersRWL.Lock()
+	defer d.playersRWL.Unlock()
+	if d.logic == nil {
+		return fmt.Errorf("logic not init")
+	}
+
+	// err := d.logic.OnStart()
+	// if err != nil {
+	// 	return err
+	// }
+
+	if d.ticker != nil {
+		d.ticker.Stop()
+	}
+	d.ticker = time.NewTicker(1 * time.Second)
 
 	go func() {
 		safecall := func(f func()) {
@@ -125,60 +120,79 @@ func (d *Table) Start() error {
 			f()
 		}
 
-		for job := range d.action {
-			safecall(job)
+		latest := time.Now()
+		for {
+			select {
+			case <-d.closed:
+				return
+			case job, ok := <-d.action:
+				if !ok {
+					return
+				}
+				safecall(job)
+			case now, ok := <-d.ticker.C:
+				if ok {
+					sub := now.Sub(latest)
+					latest = now
+					d.onTick(sub)
+				}
+			}
 		}
 	}()
+	return nil
+}
 
-	if d.ticker != nil {
-		d.ticker.Stop()
+func (d *Table) onTick(detle time.Duration) {
+	d.Age += detle
+
+	d.logic.OnTick(detle)
+
+	if d.status == bf.GameStatus_Idle && d.Age > 10*time.Second {
+		d.Close()
 	}
-
-	d.ticker = time.NewTicker(1 * time.Second)
-	go func(ticker *time.Ticker) {
-		latest := time.Now()
-		for now := range ticker.C {
-			sub := now.Sub(latest)
-			latest = now
-
-			d.PushAction(func() {
-				if d.logic != nil {
-					d.logic.OnTick(sub)
-				}
-			})
-		}
-	}(d.ticker)
-
-	return d.logic.OnStart()
 }
 
 func (d *Table) Close() {
+	select {
+	case <-d.closed:
+		return
+	default:
+		close(d.closed)
+	}
+
+	// if d.logic != nil {
+	// 	d.logic.OnReset()
+	// }
+
 	if d.ticker != nil {
 		d.ticker.Stop()
 	}
+
 	close(d.action)
+
+	d.Closer()
 }
 
-func (d *Table) ReportBattleStatus(s bf.BattleStatus) {
-	if d.battleStatus == s {
+func (d *Table) ReportBattleStatus(s bf.GameStatus) {
+	if d.status == s {
 		return
 	}
 
-	statusBefore := d.battleStatus
-	d.battleStatus = s
+	statusBefore := d.status
+	d.status = s
 
-	event := &pb.EventBattleStatusChange{
+	event := &msg.EventBattleStatusChange{
 		StatusBefore: int32(statusBefore),
 		StatusNow:    int32(s),
-		BattleId:     string(d.GetID()),
+		BattleId:     d.GetID(),
 	}
 	d.PublishEvent(event)
 
 	switch s {
-	case bf.BattleStatus_Idle:
-	case bf.BattleStatus_Started:
+	case bf.GameStatus_Idle:
+	case bf.GameStatus_Started:
 		d.reportGameStart()
-	case bf.BattleStatus_Over:
+	case bf.GameStatus_Over:
 		d.reportGameOver()
 	}
 }
@@ -200,47 +214,51 @@ func (d *Table) SendPlayerMessage(p bf.Player, msg *bf.PlayerMessage) {
 }
 
 func (d *Table) BroadcastPlayerMessage(msg *bf.PlayerMessage) {
-	d.players.Range(func(key, value interface{}) bool {
-		if p, ok := value.(*Player); ok && p != nil {
-			err := p.Send(msg)
-			if err != nil {
-				log.Error(err)
-			}
+	d.playersRWL.RLock()
+	defer d.playersRWL.RUnlock()
+
+	for _, p := range d.players {
+		err := p.Send(msg)
+		if err != nil {
+			log.Error(err)
 		}
-		return true
-	})
+	}
 }
 
 func (d *Table) IsPlaying() bool {
-	return d.battleStatus == bf.BattleStatus_Started
+	return d.status == bf.GameStatus_Started
 }
 
 func (d *Table) reportGameStart() {
 	d.StartAt = time.Now()
-	d.PublishEvent(&pb.EventBattleStart{})
+	d.PublishEvent(&msg.EventBattleStart{})
 }
 
 func (d *Table) reportGameOver() {
 	d.OverAt = time.Now()
-	d.PublishEvent(&pb.EventBattleOver{})
+	d.PublishEvent(&msg.EventBattleOver{})
 }
 
 func (d *Table) GetPlayer(uid uint64) *Player {
-	if p, has := d.players.Load(uid); has {
-		return p.(*Player)
+	d.playersRWL.RLock()
+	defer d.playersRWL.RUnlock()
+	if p, has := d.players[uid]; has {
+		return p
 	}
 	return nil
 }
 
-func (d *Table) OnPlayerJoin(uid uint64, s *tcp.Socket) {
+func (d *Table) OnPlayerJoin(uid uint64) {
 	d.PushAction(func() {
 		player := d.GetPlayer(uid)
 		if player == nil {
 			return
 		}
-		player.socket = s
 		player.online = true
 		d.onPlayerStatusChange(player)
+
+		d.readycnt++
+
 	})
 }
 
@@ -251,7 +269,6 @@ func (d *Table) OnPlayerQuit(uid uint64) {
 			return
 		}
 		player.online = false
-		player.socket = nil
 		d.onPlayerStatusChange(player)
 	})
 }
