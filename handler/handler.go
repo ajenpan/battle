@@ -62,7 +62,6 @@ func (h *Handler) OnReqStartBattle(s *context, in *msg.ReqStartBattle) (*msg.Res
 
 	closer := func() {
 		fmt.Println("battle close :", battleid)
-
 	}
 
 	d := table.NewTable(table.TableOption{
@@ -175,7 +174,7 @@ func (h *Handler) OnSessionStatus(s server.Session, enable bool) {
 	// }
 }
 
-func (h *Handler) OnSessionMessage(s server.Session, m *server.Message) {
+func (h *Handler) OnTcpMessage(s *server.TcpClient, m *server.Message) {
 	var err error
 
 	head := m.Head
@@ -200,7 +199,7 @@ func (h *Handler) OnSessionMessage(s server.Session, m *server.Message) {
 	case 1:
 		err = result[0].Interface().(error)
 	case 2:
-		err = result[1].Interface().(error)
+		err, _ = result[1].Interface().(error)
 	}
 
 	if err != nil {
@@ -208,20 +207,17 @@ func (h *Handler) OnSessionMessage(s server.Session, m *server.Message) {
 	}
 
 	if reslen == 2 {
-		// resp, ok := result[0].Interface().(proto.Message)
-		// if !ok {
-		// 	return
-		// }
-		// head.MsgType = 2
-		// var err error
-		// m.Head, err = pbmarsh.Marshal(head)
-		// if err != nil {
-		// 	return
-		// }
-		// m.Body, err = pbmarsh.Marshal(resp)
-		// if err != nil {
-		// 	return
-		// }
-		// s.Send(m)
+		if m.Head.Msgtype != 1 {
+			return
+		}
+		resp, ok := result[0].Interface().(proto.Message)
+		if !ok {
+			return
+		}
+		var resperr *server.Error
+		if err != nil {
+			resperr = &server.Error{Code: -1, Errmsg: err.Error()}
+		}
+		s.SendRespMsg(m.Head.Uid, m.Head.Seqid, resp, resperr)
 	}
 }

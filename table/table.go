@@ -23,6 +23,7 @@ func NewTable(opt TableOption) *Table {
 		TableOption: &opt,
 		CreateAt:    time.Now(),
 		closed:      make(chan struct{}),
+		players:     make(map[uint64]*Player),
 	}
 
 	ret.action = make(chan func(), 100)
@@ -93,17 +94,16 @@ func (d *Table) PushAction(f func()) {
 	d.action <- f
 }
 
+func (d *Table) AfterFunc(f func()) {
+	d.PushAction(f)
+}
+
 func (d *Table) Start() error {
 	d.playersRWL.Lock()
 	defer d.playersRWL.Unlock()
 	if d.logic == nil {
 		return fmt.Errorf("logic not init")
 	}
-
-	// err := d.logic.OnStart()
-	// if err != nil {
-	// 	return err
-	// }
 
 	if d.ticker != nil {
 		d.ticker.Stop()
@@ -147,8 +147,18 @@ func (d *Table) onTick(detle time.Duration) {
 
 	d.logic.OnTick(detle)
 
-	if d.status == bf.GameStatus_Idle && d.Age > 10*time.Second {
-		d.Close()
+	switch d.status {
+	case bf.GameStatus_Idle:
+		if d.Age > 10*time.Second {
+			// Do fouce close
+			// fmt.Println("ready timeout")
+		}
+	case bf.GameStatus_Started:
+		if d.Age > time.Duration(d.Conf.MaxBattleTime)*time.Second {
+			// Do fouce close
+			// fmt.Println("game ready timeout")
+		}
+	default:
 	}
 }
 
@@ -255,10 +265,7 @@ func (d *Table) OnPlayerJoin(uid uint64) {
 			return
 		}
 		player.online = true
-		d.onPlayerStatusChange(player)
-
-		d.readycnt++
-
+		d.onPlayerStatusChange(player, 1)
 	})
 }
 
@@ -269,15 +276,22 @@ func (d *Table) OnPlayerQuit(uid uint64) {
 			return
 		}
 		player.online = false
-		d.onPlayerStatusChange(player)
+		d.onPlayerStatusChange(player, 2)
 	})
 }
 
 func (d *Table) OnPlayerDisconn(uid uint64) {
-	d.OnPlayerQuit(uid)
+	d.PushAction(func() {
+		player := d.GetPlayer(uid)
+		if player == nil {
+			return
+		}
+		player.online = false
+		d.onPlayerStatusChange(player, 3)
+	})
 }
 
-func (d *Table) onPlayerStatusChange(p *Player) {
+func (d *Table) onPlayerStatusChange(p *Player, currstat int) {
 	d.logic.OnPlayerStatus(p)
 }
 
@@ -286,7 +300,7 @@ func (d *Table) PublishEvent(event proto.Message) {
 	// 	return
 	// }
 
-	// log.Infof("PublishEvent: %s: %v", string(proto.MessageName(event)), event)
+	log.Infof("PublishEvent: %s: %v", string(proto.MessageName(event)), event)
 
 	// raw, err := proto.Marshal(event)
 	// if err != nil {

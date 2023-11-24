@@ -20,8 +20,8 @@ import (
 func init() {
 	bf.RegisterLogic("niuniu", "1.0.0", NewLogic)
 
-	file_niuniu_niuniu_proto_init()
-	g_ct = extractCallMethod(File_niuniu_niuniu_proto.Messages(), New())
+	file_niuniu_proto_init()
+	g_ct = extractCallMethod(File_niuniu_proto.Messages(), New())
 }
 
 var g_ct *ct.CallTable[string]
@@ -35,7 +35,13 @@ func New() *Niuniu {
 		playerMap: make(map[uint16]*NNPlayer),
 		info:      &GameInfo{},
 		conf:      &Config{},
+		log:       log.Default,
 	}
+
+	ret.stagesDowntime = []int{
+		0, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+	}
+
 	return ret
 }
 
@@ -95,7 +101,7 @@ type NNPlayer struct {
 }
 
 type Config struct {
-	Downtime time.Duration
+	Downtime int
 }
 
 func ParseConfig(raw []byte) (*Config, error) {
@@ -113,14 +119,20 @@ type Niuniu struct {
 	log   *log.Logger
 
 	info      *GameInfo
-	players   []*NNPlayer
 	playerMap map[uint16]*NNPlayer // seatid to player
 
-	gameTime  time.Duration
-	stageTime time.Duration
+	gameAge        time.Duration
+	stageAge       time.Duration
+	stagesDowntime []int
+
+	stageStartAt  int64
+	stageDeadline int64
 }
 
 func PBMarshal(msg protobuf.Message) *bf.PlayerMessage {
+
+	fmt.Println("marshal: ", msg)
+
 	body, _ := protobuf.Marshal(msg)
 	return &bf.PlayerMessage{
 		Head: []byte(msg.ProtoReflect().Descriptor().FullName().Name()),
@@ -137,7 +149,23 @@ func (nn *Niuniu) Send2Player(p *NNPlayer, msg protobuf.Message) {
 }
 
 func (nn *Niuniu) OnPlayerStatus(players bf.Player) {
+	p := nn.playerConv(players)
+	if p == nil {
+		return
+	}
 
+	if nn.info.Status == GameStatus_IDLE {
+		// readycnt == len(nn.playerMap)
+		cnt := 0
+		for _, v := range nn.playerMap {
+			if v.raw.IsOnline() {
+				cnt++
+			}
+		}
+		if cnt == len(nn.playerMap) {
+			nn.doStart()
+		}
+	}
 }
 
 func (nn *Niuniu) OnInit(d bf.Table, ps []bf.Player, conf interface{}) error {
@@ -155,7 +183,7 @@ func (nn *Niuniu) OnInit(d bf.Table, ps []bf.Player, conf interface{}) error {
 	}
 	nn.table = d
 	nn.info.Status = GameStatus_IDLE
-	nn.gameTime = 0
+	nn.gameAge = 0
 
 	for _, v := range ps {
 		nn.addPlayer(v)
@@ -163,14 +191,9 @@ func (nn *Niuniu) OnInit(d bf.Table, ps []bf.Player, conf interface{}) error {
 	return nil
 }
 
-func (nn *Niuniu) OnStart() error {
-	if len(nn.playerMap) < 2 {
-		return fmt.Errorf("player is not enrough")
-	}
-
+func (nn *Niuniu) doStart() {
 	nn.table.ReportBattleStatus(bf.GameStatus_Started)
 	nn.ChangeLogicStep(GameStatus_BEGIN)
-	return nil
 }
 
 func (nn *Niuniu) OnCommand(topic string, data []byte) {
@@ -281,36 +304,35 @@ func (nn *Niuniu) addPlayer(p bf.Player) (*NNPlayer, error) {
 }
 
 func (nn *Niuniu) OnTick(duration time.Duration) {
-	nn.gameTime += duration
-	nn.stageTime += duration
+	nn.gameAge += duration
+	nn.stageAge += duration
 
 	switch nn.getLogicStep() {
-	case GameStatus_UNKNOW:
-		fallthrough
 	case GameStatus_IDLE:
-		//do nothing, when the game create but not start
+	//do nothing, when the game create but not start
 	case GameStatus_BEGIN:
-		nn.ChangeLogicStep(GameStatus_BANKER)
-
+		if nn.StepTimeover() {
+			nn.NextStep()
+		}
 	case GameStatus_BANKER:
-		if nn.StepTimeover() || nn.checkPlayerStep(GameStatus_BANKER) {
-			nn.ChangeLogicStep(GameStatus_BANKER_NOTIFY)
+		if nn.StepTimeover() || nn.checkEndBanker() {
+			nn.NextStep()
 		}
 	case GameStatus_BANKER_NOTIFY:
 		if nn.StepTimeover() {
 			nn.notifyRobBanker()
-			nn.ChangeLogicStep(GameStatus_BET)
+			nn.NextStep()
 		}
 	case GameStatus_BET: // 下注
 		if nn.StepTimeover() || nn.checkPlayerStep(GameStatus_BET) {
-			nn.ChangeLogicStep(GameStatus_DEAL_CARDS)
+			nn.NextStep()
 		}
 	case GameStatus_DEAL_CARDS: // 发牌
 		nn.sendCardToPlayer()
-		nn.ChangeLogicStep(GameStatus_SHOW_CARDS)
+		nn.NextStep()
 	case GameStatus_SHOW_CARDS: // 开牌
 		if nn.StepTimeover() || nn.checkPlayerStep(GameStatus_SHOW_CARDS) {
-			nn.ChangeLogicStep(GameStatus_TALLY)
+			nn.NextStep()
 		}
 	case GameStatus_TALLY:
 		nn.beginTally()
@@ -321,6 +343,7 @@ func (nn *Niuniu) OnTick(duration time.Duration) {
 			nn.NextStep()
 		}
 	default:
+		fmt.Println("unknow step")
 		//warn
 	}
 }
@@ -334,8 +357,11 @@ func (nn *Niuniu) getLogicStep() GameStatus {
 }
 
 func (nn *Niuniu) getStageDowntime(s GameStatus) time.Duration {
-	//TODO:
-	return nn.conf.Downtime
+	ret := time.Duration(nn.conf.Downtime) * time.Second
+	if int(s) < len(nn.stagesDowntime) {
+		ret = time.Duration(nn.stagesDowntime[s]) * time.Second
+	}
+	return ret
 }
 
 func nextStep(status GameStatus) GameStatus {
@@ -348,7 +374,7 @@ func nextStep(status GameStatus) GameStatus {
 
 func previousStep(status GameStatus) GameStatus {
 	previousStatus := status - 1
-	if previousStatus < GameStatus_UNKNOW {
+	if previousStatus < GameStatus_IDLE {
 		previousStatus = GameStatus_OVER
 	}
 	return previousStatus
@@ -365,17 +391,17 @@ func (nn *Niuniu) ChangeLogicStep(s GameStatus) {
 	}
 	nn.info.Status = s
 
-	if beforeStatus != s {
-		//reset stage time
-		nn.stageTime = 0
-	}
+	countdown := nn.getStageDowntime(s).Seconds()
 
-	donwtime := nn.getStageDowntime(s).Seconds()
+	//reset stage time
+	nn.stageAge = 0
+	nn.stageStartAt = time.Now().Unix()
+	nn.stageDeadline = nn.stageStartAt + int64(countdown)
 
-	nn.log.Infof("game step changed, before:%v, now:%v ", beforeStatus, s)
+	nn.log.Infof("game step changed, before:%d, now:%d", beforeStatus, s)
 
 	if beforeStatus == s {
-		nn.log.Errorf("set same step before:%v, now:%v", beforeStatus, s)
+		nn.log.Errorf("set same step before:%d, now:%d", beforeStatus, s)
 	}
 
 	if beforeStatus != GameStatus_OVER {
@@ -385,13 +411,13 @@ func (nn *Niuniu) ChangeLogicStep(s GameStatus) {
 	}
 
 	notice := &NotifyGameStatusChange{
-		BeforeStatus:  beforeStatus,
-		CurrentStatus: s,
-		TimeDown:      int32(donwtime),
+		BeforeStatus: beforeStatus,
+		CurrStatus:   s,
+		CountDown:    int32(countdown),
+		StatusAt:     uint32(nn.stageStartAt),
 	}
 
 	nn.BroadcastMessage(notice)
-
 	nn.Debug()
 }
 
@@ -408,7 +434,7 @@ func (nn *Niuniu) getPlayerBySeatId(seatid uint16) *NNPlayer {
 }
 
 func (nn *Niuniu) StepTimeover() bool {
-	return nn.stageTime >= nn.getStageDowntime(nn.info.Status)
+	return nn.stageAge >= nn.getStageDowntime(nn.info.Status)
 }
 
 func (nn *Niuniu) checkPlayerStep(expect GameStatus) bool {
@@ -557,5 +583,5 @@ func (nn *Niuniu) resetDesk() {
 }
 
 func (nn *Niuniu) Debug() {
-	fmt.Println(nn.info.String())
+	fmt.Println("debug: ", nn.info.String())
 }

@@ -50,12 +50,13 @@ type Table interface {
 
 	ReportBattleStatus(GameStatus)
 	ReportBattleEvent(event proto.Message)
+
+	AfterFunc(func())
 }
 
 type Logic interface {
 	OnInit(c Table, players []Player, conf interface{}) error
 
-	OnStart() error
 	OnTick(time.Duration)
 	OnReset()
 

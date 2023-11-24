@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package logic.niuniu;
 
-option go_package = "/niuniu";
+option go_package = ".;niuniu";
 
 // 牌型类型
 enum BullType {
@@ -23,17 +23,16 @@ enum BullType {
 }
 
 enum GameStatus {
-  UNKNOW = 0;
-  IDLE = 1;          // 空闲,等待玩家准备
-  COUNTDOWN = 2;     // 开始倒计时
-  BEGIN = 3;         // 开始
-  BANKER = 4;        // 抢庄
-  BANKER_NOTIFY = 5; // 通知庄
-  BET = 6;           // 下注
-  DEAL_CARDS = 7;    // 发牌
-  SHOW_CARDS = 8;    // 亮牌
-  TALLY = 9;         // 游戏结算
-  OVER = 10;         // 游戏结束
+  IDLE = 0;          // 空闲,等待玩家准备
+  COUNTDOWN = 1;     // 开始倒计时
+  BEGIN = 2;         // 开始
+  BANKER = 3;        // 抢庄
+  BANKER_NOTIFY = 4; // 通知庄
+  BET = 5;           // 下注
+  DEAL_CARDS = 6;    // 发牌
+  SHOW_CARDS = 7;    // 亮牌
+  TALLY = 8;         // 游戏结算
+  OVER = 9;          // 游戏结束
 }
 
 message OutCardInfo {
@@ -67,9 +66,9 @@ message GameInfoResponse {
 
 message NotifyGameStatusChange {
   GameStatus before_status = 1; // 游戏状态
-  GameStatus current_status = 2;
-  int32 time_down = 3;  // 倒计时
-  uint64 timestamp = 4; // 时间戳
+  GameStatus curr_status = 2;
+  uint32 status_at = 3; // 状态开始时间戳
+  int32 count_down = 4; // 倒计时
 }
 
 // 用户请求抢庄
