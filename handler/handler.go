@@ -9,9 +9,9 @@ import (
 
 	"route/server"
 
-	bf "github.com/ajenpan/battlefield"
-	"github.com/ajenpan/battlefield/msg"
-	"github.com/ajenpan/battlefield/table"
+	bf "github.com/ajenpan/battle"
+	"github.com/ajenpan/battle/msg"
+	"github.com/ajenpan/battle/table"
 	log "github.com/ajenpan/surf/logger"
 
 	"github.com/ajenpan/surf/utils/calltable"

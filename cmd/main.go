@@ -13,17 +13,17 @@ import (
 	"route/auth"
 	"route/server"
 
-	bfh "github.com/ajenpan/battlefield/handler"
-	"github.com/ajenpan/battlefield/msg"
+	bfh "github.com/ajenpan/battle/handler"
+	"github.com/ajenpan/battle/msg"
 	"github.com/ajenpan/surf/logger"
 	"github.com/ajenpan/surf/utils/rsagen"
 	utilSignal "github.com/ajenpan/surf/utils/signal"
 
-	_ "github.com/ajenpan/battlefield/logic/niuniu"
+	_ "github.com/ajenpan/battle/logic/niuniu"
 )
 
 var (
-	Name       string = "battlefield"
+	Name       string = "battle"
 	Version    string = "unknow"
 	GitCommit  string = "unknow"
 	BuildAt    string = "unknow"

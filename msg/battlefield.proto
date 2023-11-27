@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package battlefield;
+package battle;
 
 option go_package = "/msg";
 

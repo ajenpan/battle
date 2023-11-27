@@ -3,7 +3,7 @@ package noop
 // import (
 // 	"time"
 
-// 	battle "github.com/ajenpan/battlefield"
+// 	battle "github.com/ajenpan/battle"
 // )
 
 // func NewGameLogic() battle.Battle {

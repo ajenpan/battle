@@ -12,7 +12,7 @@ import (
 	protobuf "google.golang.org/protobuf/proto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 
-	bf "github.com/ajenpan/battlefield"
+	bf "github.com/ajenpan/battle"
 
 	ct "github.com/ajenpan/surf/utils/calltable"
 )

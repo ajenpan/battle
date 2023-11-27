@@ -5,8 +5,8 @@ import (
 
 	protobuf "google.golang.org/protobuf/proto"
 
-	bf "github.com/ajenpan/battlefield"
-	pb "github.com/ajenpan/battlefield/msg"
+	bf "github.com/ajenpan/battle"
+	pb "github.com/ajenpan/battle/msg"
 )
 
 func NewPlayer(p *pb.PlayerInfo) *Player {

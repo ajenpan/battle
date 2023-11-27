@@ -1,4 +1,4 @@
-package battlefield
+package battle
 
 import (
 	"time"

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.31.0
 // 	protoc        v3.18.1
-// source: msg/battlefield.proto
+// source: msg/battle.proto
 
 package msg
 
@@ -297,7 +297,7 @@ type PlayerInfo struct {
 
 	Uid       uint64            `protobuf:"varint,1,opt,name=uid,proto3" json:"uid,omitempty"`
 	SeatId    uint32            `protobuf:"varint,2,opt,name=seat_id,json=seatId,proto3" json:"seat_id,omitempty"`
-	Role      PlayerRoleType    `protobuf:"varint,3,opt,name=role,proto3,enum=battlefield.PlayerRoleType" json:"role,omitempty"`
+	Role      PlayerRoleType    `protobuf:"varint,3,opt,name=role,proto3,enum=battle.PlayerRoleType" json:"role,omitempty"`
 	MainScore int64             `protobuf:"varint,4,opt,name=main_score,json=mainScore,proto3" json:"main_score,omitempty"`
 	SubScores []int64           `protobuf:"varint,5,rep,packed,name=sub_scores,json=subScores,proto3" json:"sub_scores,omitempty"`
 	Extra     map[string]string `protobuf:"bytes,6,rep,name=extra,proto3" json:"extra,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
@@ -656,7 +656,7 @@ type ReportBattleOver struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	State ReportBattleOver_State                  `protobuf:"varint,1,opt,name=state,proto3,enum=battlefield.ReportBattleOver_State" json:"state,omitempty"`
+	State ReportBattleOver_State                  `protobuf:"varint,1,opt,name=state,proto3,enum=battle.ReportBattleOver_State" json:"state,omitempty"`
 	Tally map[int32]*ReportBattleOver_BattleScore `protobuf:"bytes,2,rep,name=tally,proto3" json:"tally,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
@@ -1164,7 +1164,7 @@ type NotifyBattleStatus struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Status BattleStatus `protobuf:"varint,1,opt,name=status,proto3,enum=battlefield.BattleStatus" json:"status,omitempty"`
+	Status BattleStatus `protobuf:"varint,1,opt,name=status,proto3,enum=battle.BattleStatus" json:"status,omitempty"`
 }
 
 func (x *NotifyBattleStatus) Reset() {
@@ -1211,7 +1211,7 @@ type BattleInfo struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	CurrStatus BattleStatus `protobuf:"varint,1,opt,name=curr_status,json=currStatus,proto3,enum=battlefield.BattleStatus" json:"curr_status,omitempty"`
+	CurrStatus BattleStatus `protobuf:"varint,1,opt,name=curr_status,json=currStatus,proto3,enum=battle.BattleStatus" json:"curr_status,omitempty"`
 }
 
 func (x *BattleInfo) Reset() {
@@ -1779,62 +1779,62 @@ func file_msg_battlefield_proto_rawDescGZIP() []byte {
 var file_msg_battlefield_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
 var file_msg_battlefield_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
 var file_msg_battlefield_proto_goTypes = []interface{}{
-	(PlayerRoleType)(0),                  // 0: battlefield.PlayerRoleType
-	(BattleStatus)(0),                    // 1: battlefield.BattleStatus
-	(ReportBattleOver_State)(0),          // 2: battlefield.ReportBattleOver.State
-	(*CallError)(nil),                    // 3: battlefield.CallError
-	(*MsgHeader)(nil),                    // 4: battlefield.MsgHeader
-	(*PlayerInfo)(nil),                   // 5: battlefield.PlayerInfo
-	(*BattleConfig)(nil),                 // 6: battlefield.BattleConfig
-	(*ReqStartBattle)(nil),               // 7: battlefield.ReqStartBattle
-	(*RespStartBattle)(nil),              // 8: battlefield.RespStartBattle
-	(*ReqStopBattle)(nil),                // 9: battlefield.ReqStopBattle
-	(*RespStopBattle)(nil),               // 10: battlefield.RespStopBattle
-	(*ReportBattleOver)(nil),             // 11: battlefield.ReportBattleOver
-	(*EventBattleStatusChange)(nil),      // 12: battlefield.EventBattleStatusChange
-	(*EventBattleStart)(nil),             // 13: battlefield.EventBattleStart
-	(*EventBattleOver)(nil),              // 14: battlefield.EventBattleOver
-	(*ReqJoinBattle)(nil),                // 15: battlefield.ReqJoinBattle
-	(*RespJoinBattle)(nil),               // 16: battlefield.RespJoinBattle
-	(*ReqQuitBattle)(nil),                // 17: battlefield.ReqQuitBattle
-	(*RespQuitBattle)(nil),               // 18: battlefield.RespQuitBattle
-	(*BattleMessageWrap)(nil),            // 19: battlefield.BattleMessageWrap
-	(*NotifyPlayerStatus)(nil),           // 20: battlefield.NotifyPlayerStatus
-	(*NotifyBattleStatus)(nil),           // 21: battlefield.NotifyBattleStatus
-	(*BattleInfo)(nil),                   // 22: battlefield.BattleInfo
-	(*ReqBattleInfo)(nil),                // 23: battlefield.ReqBattleInfo
-	(*RespBattlInfo)(nil),                // 24: battlefield.RespBattlInfo
-	(*MsgToClientWrap)(nil),              // 25: battlefield.MsgToClientWrap
-	(*MsgToLogicWrap)(nil),               // 26: battlefield.MsgToLogicWrap
-	nil,                                  // 27: battlefield.PlayerInfo.ExtraEntry
-	(*ReportBattleOver_BattleScore)(nil), // 28: battlefield.ReportBattleOver.BattleScore
-	nil,                                  // 29: battlefield.ReportBattleOver.TallyEntry
-	nil,                                  // 30: battlefield.ReportBattleOver.BattleScore.ExtraEntry
-	(*RespJoinBattle_ReadyInfo)(nil),     // 31: battlefield.RespJoinBattle.ReadyInfo
+	(PlayerRoleType)(0),                  // 0: battle.PlayerRoleType
+	(BattleStatus)(0),                    // 1: battle.BattleStatus
+	(ReportBattleOver_State)(0),          // 2: battle.ReportBattleOver.State
+	(*CallError)(nil),                    // 3: battle.CallError
+	(*MsgHeader)(nil),                    // 4: battle.MsgHeader
+	(*PlayerInfo)(nil),                   // 5: battle.PlayerInfo
+	(*BattleConfig)(nil),                 // 6: battle.BattleConfig
+	(*ReqStartBattle)(nil),               // 7: battle.ReqStartBattle
+	(*RespStartBattle)(nil),              // 8: battle.RespStartBattle
+	(*ReqStopBattle)(nil),                // 9: battle.ReqStopBattle
+	(*RespStopBattle)(nil),               // 10: battle.RespStopBattle
+	(*ReportBattleOver)(nil),             // 11: battle.ReportBattleOver
+	(*EventBattleStatusChange)(nil),      // 12: battle.EventBattleStatusChange
+	(*EventBattleStart)(nil),             // 13: battle.EventBattleStart
+	(*EventBattleOver)(nil),              // 14: battle.EventBattleOver
+	(*ReqJoinBattle)(nil),                // 15: battle.ReqJoinBattle
+	(*RespJoinBattle)(nil),               // 16: battle.RespJoinBattle
+	(*ReqQuitBattle)(nil),                // 17: battle.ReqQuitBattle
+	(*RespQuitBattle)(nil),               // 18: battle.RespQuitBattle
+	(*BattleMessageWrap)(nil),            // 19: battle.BattleMessageWrap
+	(*NotifyPlayerStatus)(nil),           // 20: battle.NotifyPlayerStatus
+	(*NotifyBattleStatus)(nil),           // 21: battle.NotifyBattleStatus
+	(*BattleInfo)(nil),                   // 22: battle.BattleInfo
+	(*ReqBattleInfo)(nil),                // 23: battle.ReqBattleInfo
+	(*RespBattlInfo)(nil),                // 24: battle.RespBattlInfo
+	(*MsgToClientWrap)(nil),              // 25: battle.MsgToClientWrap
+	(*MsgToLogicWrap)(nil),               // 26: battle.MsgToLogicWrap
+	nil,                                  // 27: battle.PlayerInfo.ExtraEntry
+	(*ReportBattleOver_BattleScore)(nil), // 28: battle.ReportBattleOver.BattleScore
+	nil,                                  // 29: battle.ReportBattleOver.TallyEntry
+	nil,                                  // 30: battle.ReportBattleOver.BattleScore.ExtraEntry
+	(*RespJoinBattle_ReadyInfo)(nil),     // 31: battle.RespJoinBattle.ReadyInfo
 }
 var file_msg_battlefield_proto_depIdxs = []int32{
-	3,  // 0: battlefield.MsgHeader.err:type_name -> battlefield.CallError
-	0,  // 1: battlefield.PlayerInfo.role:type_name -> battlefield.PlayerRoleType
-	27, // 2: battlefield.PlayerInfo.extra:type_name -> battlefield.PlayerInfo.ExtraEntry
-	6,  // 3: battlefield.ReqStartBattle.battle_conf:type_name -> battlefield.BattleConfig
-	5,  // 4: battlefield.ReqStartBattle.player_infos:type_name -> battlefield.PlayerInfo
-	2,  // 5: battlefield.ReportBattleOver.state:type_name -> battlefield.ReportBattleOver.State
-	29, // 6: battlefield.ReportBattleOver.tally:type_name -> battlefield.ReportBattleOver.TallyEntry
-	31, // 7: battlefield.RespJoinBattle.ready_info:type_name -> battlefield.RespJoinBattle.ReadyInfo
-	1,  // 8: battlefield.NotifyBattleStatus.status:type_name -> battlefield.BattleStatus
-	1,  // 9: battlefield.BattleInfo.curr_status:type_name -> battlefield.BattleStatus
-	22, // 10: battlefield.RespBattlInfo.battle_info:type_name -> battlefield.BattleInfo
-	5,  // 11: battlefield.RespBattlInfo.player_infos:type_name -> battlefield.PlayerInfo
-	30, // 12: battlefield.ReportBattleOver.BattleScore.extra:type_name -> battlefield.ReportBattleOver.BattleScore.ExtraEntry
-	28, // 13: battlefield.ReportBattleOver.TallyEntry.value:type_name -> battlefield.ReportBattleOver.BattleScore
-	7,  // 14: battlefield.Battle.StartBattle:input_type -> battlefield.ReqStartBattle
-	9,  // 15: battlefield.Battle.StopBattle:input_type -> battlefield.ReqStopBattle
-	15, // 16: battlefield.Battle.JoinBattle:input_type -> battlefield.ReqJoinBattle
-	17, // 17: battlefield.Battle.QuitBattle:input_type -> battlefield.ReqQuitBattle
-	8,  // 18: battlefield.Battle.StartBattle:output_type -> battlefield.RespStartBattle
-	10, // 19: battlefield.Battle.StopBattle:output_type -> battlefield.RespStopBattle
-	16, // 20: battlefield.Battle.JoinBattle:output_type -> battlefield.RespJoinBattle
-	18, // 21: battlefield.Battle.QuitBattle:output_type -> battlefield.RespQuitBattle
+	3,  // 0: battle.MsgHeader.err:type_name -> battle.CallError
+	0,  // 1: battle.PlayerInfo.role:type_name -> battle.PlayerRoleType
+	27, // 2: battle.PlayerInfo.extra:type_name -> battle.PlayerInfo.ExtraEntry
+	6,  // 3: battle.ReqStartBattle.battle_conf:type_name -> battle.BattleConfig
+	5,  // 4: battle.ReqStartBattle.player_infos:type_name -> battle.PlayerInfo
+	2,  // 5: battle.ReportBattleOver.state:type_name -> battle.ReportBattleOver.State
+	29, // 6: battle.ReportBattleOver.tally:type_name -> battle.ReportBattleOver.TallyEntry
+	31, // 7: battle.RespJoinBattle.ready_info:type_name -> battle.RespJoinBattle.ReadyInfo
+	1,  // 8: battle.NotifyBattleStatus.status:type_name -> battle.BattleStatus
+	1,  // 9: battle.BattleInfo.curr_status:type_name -> battle.BattleStatus
+	22, // 10: battle.RespBattlInfo.battle_info:type_name -> battle.BattleInfo
+	5,  // 11: battle.RespBattlInfo.player_infos:type_name -> battle.PlayerInfo
+	30, // 12: battle.ReportBattleOver.BattleScore.extra:type_name -> battle.ReportBattleOver.BattleScore.ExtraEntry
+	28, // 13: battle.ReportBattleOver.TallyEntry.value:type_name -> battle.ReportBattleOver.BattleScore
+	7,  // 14: battle.Battle.StartBattle:input_type -> battle.ReqStartBattle
+	9,  // 15: battle.Battle.StopBattle:input_type -> battle.ReqStopBattle
+	15, // 16: battle.Battle.JoinBattle:input_type -> battle.ReqJoinBattle
+	17, // 17: battle.Battle.QuitBattle:input_type -> battle.ReqQuitBattle
+	8,  // 18: battle.Battle.StartBattle:output_type -> battle.RespStartBattle
+	10, // 19: battle.Battle.StopBattle:output_type -> battle.RespStopBattle
+	16, // 20: battle.Battle.JoinBattle:output_type -> battle.RespJoinBattle
+	18, // 21: battle.Battle.QuitBattle:output_type -> battle.RespQuitBattle
 	18, // [18:22] is the sub-list for method output_type
 	14, // [14:18] is the sub-list for method input_type
 	14, // [14:14] is the sub-list for extension type_name

@@ -7,8 +7,8 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	bf "github.com/ajenpan/battlefield"
-	"github.com/ajenpan/battlefield/msg"
+	bf "github.com/ajenpan/battle"
+	"github.com/ajenpan/battle/msg"
 	log "github.com/ajenpan/surf/logger"
 )
 
