@@ -9,7 +9,7 @@ import (
 
 	bf "github.com/ajenpan/battle"
 	"github.com/ajenpan/battle/msg"
-	log "github.com/ajenpan/surf/logger"
+	"github.com/ajenpan/surf/log"
 )
 
 type TableOption struct {
@@ -23,7 +23,7 @@ func NewTable(opt TableOption) *Table {
 		TableOption: &opt,
 		CreateAt:    time.Now(),
 		closed:      make(chan struct{}),
-		players:     make(map[uint64]*Player),
+		players:     make(map[uint32]*Player),
 	}
 
 	ret.action = make(chan func(), 100)
@@ -49,7 +49,7 @@ type Table struct {
 	// evenReport
 
 	playersRWL sync.RWMutex
-	players    map[uint64]*Player
+	players    map[uint32]*Player
 
 	action chan func()
 	closed chan struct{}
@@ -147,19 +147,19 @@ func (d *Table) onTick(detle time.Duration) {
 
 	d.logic.OnTick(detle)
 
-	switch d.status {
-	case bf.GameStatus_Idle:
-		if d.Age > 10*time.Second {
-			// Do fouce close
-			// fmt.Println("ready timeout")
-		}
-	case bf.GameStatus_Started:
-		if d.Age > time.Duration(d.Conf.MaxBattleTime)*time.Second {
-			// Do fouce close
-			// fmt.Println("game ready timeout")
-		}
-	default:
-	}
+	// switch d.status {
+	// case bf.GameStatus_Idle:
+	// 	if d.Age > 10*time.Second {
+	// 		// Do fouce close
+	// 		// fmt.Println("ready timeout")
+	// 	}
+	// case bf.GameStatus_Started:
+	// 	if d.Age > time.Duration(d.Conf.MaxBattleTime)*time.Second {
+	// 		// Do fouce close
+	// 		// fmt.Println("game ready timeout")
+	// 	}
+	// default:
+	// }
 }
 
 func (d *Table) Close() {
@@ -249,7 +249,7 @@ func (d *Table) reportGameOver() {
 	d.PublishEvent(&msg.EventBattleOver{})
 }
 
-func (d *Table) GetPlayer(uid uint64) *Player {
+func (d *Table) GetPlayer(uid uint32) *Player {
 	d.playersRWL.RLock()
 	defer d.playersRWL.RUnlock()
 	if p, has := d.players[uid]; has {
@@ -258,7 +258,7 @@ func (d *Table) GetPlayer(uid uint64) *Player {
 	return nil
 }
 
-func (d *Table) OnPlayerJoin(uid uint64) {
+func (d *Table) OnPlayerJoin(uid uint32) {
 	d.PushAction(func() {
 		player := d.GetPlayer(uid)
 		if player == nil {
@@ -269,7 +269,7 @@ func (d *Table) OnPlayerJoin(uid uint64) {
 	})
 }
 
-func (d *Table) OnPlayerQuit(uid uint64) {
+func (d *Table) OnPlayerQuit(uid uint32) {
 	d.PushAction(func() {
 		player := d.GetPlayer(uid)
 		if player == nil {
@@ -280,7 +280,7 @@ func (d *Table) OnPlayerQuit(uid uint64) {
 	})
 }
 
-func (d *Table) OnPlayerDisconn(uid uint64) {
+func (d *Table) OnPlayerDisconn(uid uint32) {
 	d.PushAction(func() {
 		player := d.GetPlayer(uid)
 		if player == nil {
@@ -315,7 +315,7 @@ func (d *Table) PublishEvent(event proto.Message) {
 	// d.EventPublisher.Publish(warp)
 }
 
-func (d *Table) OnPlayerMessage(uid uint64, p *bf.PlayerMessage) {
+func (d *Table) OnPlayerMessage(uid uint32, p *bf.PlayerMessage) {
 	d.action <- func() {
 		player := d.GetPlayer(uid)
 		if player != nil && d.logic != nil {

@@ -58,7 +58,7 @@ func (p *Player) GetBattleID() string {
 	return p.battleid
 }
 
-func (p *Player) GetUID() uint64 {
+func (p *Player) GetUID() uint32 {
 	return p.PlayerInfo.Uid
 }
 

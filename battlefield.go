@@ -36,7 +36,7 @@ type PlayerBattleInfo interface {
 }
 
 type Player interface {
-	GetUID() uint64
+	GetUID() uint32
 	GetRole() int32
 
 	PlayerStatus

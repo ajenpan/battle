@@ -8,7 +8,7 @@ import (
 	"time"
 
 	nncard "github.com/ajenpan/poker_algorithm/niuniu"
-	log "github.com/ajenpan/surf/logger"
+	"github.com/ajenpan/surf/log"
 	protobuf "google.golang.org/protobuf/proto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 

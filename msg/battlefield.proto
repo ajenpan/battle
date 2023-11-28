@@ -29,7 +29,7 @@ enum PlayerRoleType {
 }
 
 message PlayerInfo {
-  uint64 uid = 1;
+  uint32 uid = 1;
   uint32 seat_id = 2;
   PlayerRoleType role = 3;
   int64 main_score = 4;
@@ -95,7 +95,7 @@ message ReqJoinBattle {
 message RespJoinBattle {
   message ReadyInfo {
     uint32 seat_id = 1;
-    int64 uid = 2;
+    uint32 uid = 2;
     int32 ready_state = 3;
   }
   repeated ReadyInfo ready_info = 1;

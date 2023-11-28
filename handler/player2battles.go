@@ -4,16 +4,16 @@ import "sync"
 
 type Player2Battles struct {
 	rwlock         sync.RWMutex
-	player2battles map[uint64]*PlayerBattles
+	player2battles map[uint32]*PlayerBattles
 }
 
-func (pb *Player2Battles) GetPlayerBattle(uid uint64) *PlayerBattles {
+func (pb *Player2Battles) GetPlayerBattle(uid uint32) *PlayerBattles {
 	pb.rwlock.RLock()
 	defer pb.rwlock.RUnlock()
 	return pb.player2battles[uid]
 }
 
-func (pb *Player2Battles) storePlayerBattle(uid uint64, info *PlayerBattles) *PlayerBattles {
+func (pb *Player2Battles) storePlayerBattle(uid uint32, info *PlayerBattles) *PlayerBattles {
 	pb.rwlock.Lock()
 	defer pb.rwlock.Unlock()
 	if old, has := pb.player2battles[uid]; has {
@@ -22,13 +22,13 @@ func (pb *Player2Battles) storePlayerBattle(uid uint64, info *PlayerBattles) *Pl
 	pb.player2battles[uid] = info
 	return info
 }
-func (pb *Player2Battles) deletePlayerBattle(uid uint64) {
+func (pb *Player2Battles) deletePlayerBattle(uid uint32) {
 	pb.rwlock.Lock()
 	defer pb.rwlock.Unlock()
 	delete(pb.player2battles, uid)
 }
 
-func (pb *Player2Battles) AddPlayerBattle(uid uint64, battleid uint64) {
+func (pb *Player2Battles) AddPlayerBattle(uid uint32, battleid uint64) {
 	infos := pb.GetPlayerBattle(uid)
 	if infos != nil {
 		infos.JoinBattle(battleid)
@@ -41,7 +41,7 @@ func (pb *Player2Battles) AddPlayerBattle(uid uint64, battleid uint64) {
 	}
 }
 
-func (pb *Player2Battles) RemovePlayerBattle(uid uint64, battleid uint64) {
+func (pb *Player2Battles) RemovePlayerBattle(uid uint32, battleid uint64) {
 	infos := pb.GetPlayerBattle(uid)
 	if infos != nil {
 		infos.QuitBattle(battleid)
