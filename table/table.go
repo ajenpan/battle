@@ -7,9 +7,11 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ajenpan/battle"
 	bf "github.com/ajenpan/battle"
 	"github.com/ajenpan/battle/msg"
 	"github.com/ajenpan/surf/log"
+	"github.com/ajenpan/surf/server"
 )
 
 type TableOption struct {
@@ -28,6 +30,9 @@ func NewTable(opt TableOption) *Table {
 
 	ret.action = make(chan func(), 100)
 
+	if ret.Conf == nil {
+		ret.Conf = &msg.BattleConfig{}
+	}
 	if ret.Conf.MaxBattleTime == 0 {
 		ret.Conf.MaxBattleTime = 300
 	}
@@ -57,8 +62,6 @@ type Table struct {
 	ticker *time.Ticker
 
 	status bf.GameStatus
-
-	readycnt int
 }
 
 func (d *Table) GetID() uint64 {
@@ -147,19 +150,20 @@ func (d *Table) onTick(detle time.Duration) {
 
 	d.logic.OnTick(detle)
 
-	// switch d.status {
-	// case bf.GameStatus_Idle:
-	// 	if d.Age > 10*time.Second {
-	// 		// Do fouce close
-	// 		// fmt.Println("ready timeout")
-	// 	}
-	// case bf.GameStatus_Started:
-	// 	if d.Age > time.Duration(d.Conf.MaxBattleTime)*time.Second {
-	// 		// Do fouce close
-	// 		// fmt.Println("game ready timeout")
-	// 	}
-	// default:
-	// }
+	switch d.status {
+	case bf.GameStatus_Idle:
+		if d.Age > 10*time.Second {
+			// Do fouce close
+			fmt.Println("ready timeout")
+		}
+	case bf.GameStatus_Started:
+		if d.Age > time.Duration(d.Conf.MaxBattleTime)*time.Second {
+			// Do fouce close
+			fmt.Println("game ready timeout")
+			d.Close()
+		}
+	default:
+	}
 }
 
 func (d *Table) Close() {
@@ -211,7 +215,7 @@ func (d *Table) ReportBattleEvent(event proto.Message) {
 	d.PublishEvent(event)
 }
 
-func (d *Table) SendPlayerMessage(p bf.Player, msg *bf.PlayerMessage) {
+func (d *Table) SendPlayerMessage(p bf.Player, msg *bf.PlayerMsg) {
 	rp, ok := p.(*Player)
 	if !ok {
 		log.Error("player is not Player")
@@ -223,7 +227,7 @@ func (d *Table) SendPlayerMessage(p bf.Player, msg *bf.PlayerMessage) {
 	}
 }
 
-func (d *Table) BroadcastPlayerMessage(msg *bf.PlayerMessage) {
+func (d *Table) BroadcastPlayerMessage(msg *bf.PlayerMsg) {
 	d.playersRWL.RLock()
 	defer d.playersRWL.RUnlock()
 
@@ -258,14 +262,24 @@ func (d *Table) GetPlayer(uid uint32) *Player {
 	return nil
 }
 
-func (d *Table) OnPlayerJoin(uid uint32) {
+func (d *Table) OnPlayerJoin(s server.Session, uid uint32) {
 	d.PushAction(func() {
 		player := d.GetPlayer(uid)
 		if player == nil {
 			return
 		}
-		player.online = true
-		d.onPlayerStatusChange(player, 1)
+
+		player.sender = func(raw *bf.PlayerMsg) error {
+			wrap := &msg.BattleMessageWrap{
+				BattleId: d.GetID(),
+				Head:     raw.Head,
+				Body:     raw.Body,
+			}
+			return s.SendAsync(player.Uid, wrap)
+		}
+
+		player.status = battle.PlayerStatus_Joined
+		d.onPlayerStatusChange(player, battle.PlayerStatus_Joined)
 	})
 }
 
@@ -275,7 +289,8 @@ func (d *Table) OnPlayerQuit(uid uint32) {
 		if player == nil {
 			return
 		}
-		player.online = false
+		player.status = battle.PlayerStatus_Quit
+		player.sender = nil
 		d.onPlayerStatusChange(player, 2)
 	})
 }
@@ -286,13 +301,13 @@ func (d *Table) OnPlayerDisconn(uid uint32) {
 		if player == nil {
 			return
 		}
-		player.online = false
+		player.status = battle.PlayerStatus_Disconn
 		d.onPlayerStatusChange(player, 3)
 	})
 }
 
-func (d *Table) onPlayerStatusChange(p *Player, currstat int) {
-	d.logic.OnPlayerStatus(p)
+func (d *Table) onPlayerStatusChange(p *Player, currstat battle.PlayerStatusType) {
+	d.logic.OnPlayerStatus(p, currstat)
 }
 
 func (d *Table) PublishEvent(event proto.Message) {
@@ -315,7 +330,7 @@ func (d *Table) PublishEvent(event proto.Message) {
 	// d.EventPublisher.Publish(warp)
 }
 
-func (d *Table) OnPlayerMessage(uid uint32, p *bf.PlayerMessage) {
+func (d *Table) OnPlayerMessage(uid uint32, p *bf.PlayerMsg) {
 	d.action <- func() {
 		player := d.GetPlayer(uid)
 		if player != nil && d.logic != nil {

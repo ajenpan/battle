@@ -5,6 +5,7 @@ import (
 
 	protobuf "google.golang.org/protobuf/proto"
 
+	"github.com/ajenpan/battle"
 	bf "github.com/ajenpan/battle"
 	pb "github.com/ajenpan/battle/msg"
 )
@@ -35,19 +36,13 @@ func NewPlayers(infos []*pb.PlayerInfo) ([]*Player, error) {
 	return ret, nil
 }
 
-type playerStatus struct {
-	online bool
-}
-
-func (ps *playerStatus) IsOnline() bool {
-	return ps.online
-}
-
 type Player struct {
 	*pb.PlayerInfo
-	playerStatus
+
 	battleid string
-	sender   func(msg *bf.PlayerMessage) error
+	sender   func(msg *bf.PlayerMsg) error
+
+	status battle.PlayerStatusType
 }
 
 func (p *Player) GetScore() int64 {
@@ -62,17 +57,28 @@ func (p *Player) GetUID() uint32 {
 	return p.PlayerInfo.Uid
 }
 
+func (ps *Player) SetStatus(s battle.PlayerStatusType) {
+	ps.status = s
+}
+func (ps *Player) GetStatus() battle.PlayerStatusType {
+	return ps.status
+}
+
 func (p *Player) GetSeatID() uint32 {
 	return p.PlayerInfo.SeatId
 }
 
-func (p *Player) GetRole() int32 {
-	return int32(p.PlayerInfo.Role)
+func (p *Player) GetRole() uint32 {
+	return uint32(p.PlayerInfo.Role)
 }
 
-func (p *Player) Send(msg *bf.PlayerMessage) error {
+func (p *Player) Send(msg *bf.PlayerMsg) error {
 	if p.sender == nil {
 		return fmt.Errorf("sender is nil")
 	}
 	return p.sender(msg)
+}
+
+func (p *Player) SetSender(f func(*bf.PlayerMsg) error) {
+	p.sender = f
 }

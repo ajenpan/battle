@@ -16,11 +16,11 @@ func (gd *NoopTable) GetID() uint64 {
 	return 0
 }
 
-func (gd *NoopTable) SendPlayerMessage(battle.Player, *battle.PlayerMessage) {
+func (gd *NoopTable) SendPlayerMessage(battle.Player, *battle.PlayerMsg) {
 
 }
 
-func (gd *NoopTable) BroadcastPlayerMessage(*battle.PlayerMessage) {
+func (gd *NoopTable) BroadcastPlayerMessage(*battle.PlayerMsg) {
 
 }
 

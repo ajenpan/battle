@@ -15,8 +15,8 @@ import (
 )
 
 type Handler struct {
-	battles        sync.Map
-	player2Battles *Player2Battles
+	battles sync.Map
+	// player2Battles *Player2Battles
 
 	Creator       *bf.LogicCreator
 	createCounter uint64
@@ -25,6 +25,9 @@ type Handler struct {
 func New() *Handler {
 	h := &Handler{
 		Creator: bf.DefaultLoigcCreator,
+		// player2Battles: &Player2Battles{
+		// 	player2battles: make(map[uint32]*PlayerBattles),
+		// },
 	}
 	return h
 }
@@ -104,10 +107,8 @@ func (h *Handler) OnReqJoinBattle(s *surf.Context, in *msg.ReqJoinBattle) (*msg.
 		return nil, fmt.Errorf("battle not found")
 	}
 
-	b.OnPlayerJoin(s.UId)
-
-	h.player2Battles.AddPlayerBattle(s.UId, in.BattleId)
-
+	b.OnPlayerJoin(s.Session, s.UId)
+	//h.player2Battles.AddPlayerBattle(s.UId, in.BattleId)
 	return nil, nil
 }
 
@@ -117,7 +118,7 @@ func (h *Handler) OnReqQuitBattle(s *surf.Context, in *msg.ReqQuitBattle) (*msg.
 		return nil, fmt.Errorf("battle not found")
 	}
 	b.OnPlayerQuit(s.UId)
-	h.player2Battles.RemovePlayerBattle(s.UId, in.BattleId)
+	//h.player2Battles.RemovePlayerBattle(s.UId, in.BattleId)
 	return nil, nil
 }
 
@@ -127,10 +128,11 @@ func (h *Handler) OnBattleMessageWrap(s *surf.Context, msg *msg.BattleMessageWra
 	if b == nil {
 		return
 	}
-	b.OnPlayerMessage(uid, &bf.PlayerMessage{
+	b.OnPlayerMessage(uid, &bf.PlayerMsg{
 		Head: msg.Head,
 		Body: msg.Body,
 	})
+
 }
 
 func (h *Handler) GetBattleById(battleId uint64) *table.Table {

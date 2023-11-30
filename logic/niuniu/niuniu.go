@@ -36,6 +36,7 @@ func New() *Niuniu {
 		info:      &GameInfo{},
 		conf:      &Config{},
 		log:       log.Default,
+		joined:    make(map[uint16]bool),
 	}
 
 	ret.stagesDowntime = []int{
@@ -127,14 +128,16 @@ type Niuniu struct {
 
 	stageStartAt  int64
 	stageDeadline int64
+
+	joined map[uint16]bool //加入人数
 }
 
-func PBMarshal(msg protobuf.Message) *bf.PlayerMessage {
+func PBMarshal(msg protobuf.Message) *bf.PlayerMsg {
 
 	fmt.Println("marshal: ", msg)
 
 	body, _ := protobuf.Marshal(msg)
-	return &bf.PlayerMessage{
+	return &bf.PlayerMsg{
 		Head: []byte(msg.ProtoReflect().Descriptor().FullName().Name()),
 		Body: body,
 	}
@@ -148,24 +151,16 @@ func (nn *Niuniu) Send2Player(p *NNPlayer, msg protobuf.Message) {
 	nn.table.SendPlayerMessage(p.raw, PBMarshal(msg))
 }
 
-func (nn *Niuniu) OnPlayerStatus(players bf.Player) {
+func (nn *Niuniu) OnPlayerStatus(players bf.Player, status bf.PlayerStatusType) {
 	p := nn.playerConv(players)
 	if p == nil {
 		return
 	}
 
-	if nn.info.Status == GameStatus_IDLE {
-		// readycnt == len(nn.playerMap)
-		cnt := 0
-		for _, v := range nn.playerMap {
-			if v.raw.IsOnline() {
-				cnt++
-			}
-		}
-		if cnt == len(nn.playerMap) {
-			nn.doStart()
-		}
+	if nn.info.Status == GameStatus_IDLE && status == bf.PlayerStatus_Joined {
+		nn.joined[uint16(p.raw.GetSeatID())] = true
 	}
+
 }
 
 func (nn *Niuniu) OnInit(d bf.Table, ps []bf.Player, conf interface{}) error {
@@ -186,7 +181,14 @@ func (nn *Niuniu) OnInit(d bf.Table, ps []bf.Player, conf interface{}) error {
 	nn.gameAge = 0
 
 	for _, v := range ps {
-		nn.addPlayer(v)
+		if v.GetRole() == uint32(bf.RoleType_Robot) {
+			nn.addRobot(v)
+		} else {
+			_, err := nn.addPlayer(v)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -200,7 +202,7 @@ func (nn *Niuniu) OnCommand(topic string, data []byte) {
 
 }
 
-func (nn *Niuniu) OnPlayerMessage(p bf.Player, pmsg *bf.PlayerMessage) {
+func (nn *Niuniu) OnPlayerMessage(p bf.Player, pmsg *bf.PlayerMsg) {
 	if pmsg == nil {
 		return
 	}
@@ -303,13 +305,33 @@ func (nn *Niuniu) addPlayer(p bf.Player) (*NNPlayer, error) {
 	return ret, nil
 }
 
+func (nn *Niuniu) addRobot(p bf.Player) (*NNPlayer, error) {
+	nnp, err := nn.addPlayer(p)
+	if err != nil {
+		return nil, err
+	}
+	robot := &Robot{
+		NNPlayer: nnp,
+	}
+	p.SetSender(robot.OnMsg)
+
+	p.SetStatus(bf.PlayerStatus_Joined)
+
+	// 机器人自动准备
+	nn.joined[uint16(p.GetSeatID())] = true
+
+	return nnp, nil
+}
+
 func (nn *Niuniu) OnTick(duration time.Duration) {
 	nn.gameAge += duration
 	nn.stageAge += duration
 
 	switch nn.getLogicStep() {
 	case GameStatus_IDLE:
-	//do nothing, when the game create but not start
+		if len(nn.joined) == len(nn.playerMap) {
+			nn.doStart()
+		}
 	case GameStatus_BEGIN:
 		if nn.StepTimeover() {
 			nn.NextStep()
@@ -340,7 +362,6 @@ func (nn *Niuniu) OnTick(duration time.Duration) {
 	case GameStatus_OVER:
 		if nn.StepTimeover() {
 			nn.table.ReportBattleStatus(bf.GameStatus_Over)
-			nn.NextStep()
 		}
 	default:
 		fmt.Println("unknow step")
@@ -367,7 +388,7 @@ func (nn *Niuniu) getStageDowntime(s GameStatus) time.Duration {
 func nextStep(status GameStatus) GameStatus {
 	nextStep := status + 1
 	if nextStep > GameStatus_OVER {
-		nextStep = GameStatus_IDLE
+		nextStep = GameStatus_OVER
 	}
 	return nextStep
 }
