@@ -133,9 +133,7 @@ type Niuniu struct {
 }
 
 func PBMarshal(msg protobuf.Message) *bf.PlayerMsg {
-
 	fmt.Println("marshal: ", msg)
-
 	body, _ := protobuf.Marshal(msg)
 	return &bf.PlayerMsg{
 		Head: []byte(msg.ProtoReflect().Descriptor().FullName().Name()),

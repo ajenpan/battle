@@ -3,6 +3,7 @@ syntax = "proto3";
 package logic.niuniu;
 
 option go_package = ".;niuniu";
+option csharp_namespace = "games.niuniu";
 
 // 牌型类型
 enum BullType {

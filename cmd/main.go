@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/urfave/cli/v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/ajenpan/surf"
 	"github.com/ajenpan/surf/auth"
 	"github.com/ajenpan/surf/log"
-	"github.com/ajenpan/surf/route"
 	"github.com/ajenpan/surf/server"
 	"github.com/ajenpan/surf/utils/rsagen"
 	utilSignal "github.com/ajenpan/surf/utils/signal"
@@ -62,9 +62,36 @@ func Run() error {
 	return err
 }
 
+type Config struct {
+	RouteAddrs []string `yaml:"RouteAddrs"`
+}
+
+var DefaultConf = &Config{
+	RouteAddrs: []string{"localhost:8080"},
+}
+
+func InitConf(conf *Config) error {
+	data, err := os.ReadFile("conf.yaml")
+	if err != nil {
+		return err
+	}
+	return yaml.Unmarshal(data, &conf)
+}
+
+func PrintConf(conf *Config) {
+	data, _ := yaml.Marshal(conf)
+	fmt.Println(string(data))
+}
+
 var battleuid = uint32(1001)
 
 func RealMain(c *cli.Context) error {
+	if err := InitConf(DefaultConf); err != nil {
+		log.Error(err)
+		return err
+	}
+	PrintConf(DefaultConf)
+
 	pk, err := rsagen.LoadRsaPrivateKeyFromFile("private.pem")
 	if err != nil {
 		return err
@@ -74,25 +101,21 @@ func RealMain(c *cli.Context) error {
 		UId:   10001,
 		UName: "user1",
 		URole: "user",
-	}, 24*time.Hour)
+	}, 2400*time.Hour)
 	fmt.Println(usr1)
 
 	jwt, _ := auth.GenerateToken(pk, &auth.UserInfo{
 		UId:   battleuid,
-		UName: "battle",
+		UName: "battle1",
 		URole: "battle",
-	}, 24*time.Hour)
-
-	svr := server1(pk.Public().(*rsa.PublicKey), ":8080")
-	svr.Start()
-	defer svr.Stop()
+	}, 2400*time.Hour)
 
 	bh := handler.New()
 	opts := &surf.Options{
 		JWToken:    jwt,
-		RouteAddrs: []string{"localhost:8080"},
+		RouteAddrs: DefaultConf.RouteAddrs,
 		UnhandleFunc: func(s *server.TcpClient, m *server.MsgWraper) {
-			log.Infof("recv msg: %v", m)
+			log.Infof("recv unhandle msg: %v", m)
 		},
 	}
 	core := surf.New(opts)
@@ -104,33 +127,29 @@ func RealMain(c *cli.Context) error {
 	core.Start()
 	defer core.Stop()
 
-	// cli := conn2(pk)
-	// cli.Connect()
-	// defer cli.Close()
-
 	s := utilSignal.WaitShutdown()
 	log.Infof("recv signal: %v", s.String())
 	return nil
 }
 
-func server1(pk *rsa.PublicKey, listenAt string) *server.TcpServer {
-	var err error
-	h, err := route.NewRouter()
-	if err != nil {
-		panic(err)
-	}
-	svropt := &server.TcpServerOptions{
-		AuthPublicKey:    pk,
-		ListenAddr:       listenAt,
-		OnSessionMessage: h.OnSessionMessage,
-		OnSessionStatus:  h.OnSessionStatus,
-	}
-	svr, err := server.NewTcpServer(svropt)
-	if err != nil {
-		panic(err)
-	}
-	return svr
-}
+// func server1(pk *rsa.PublicKey, listenAt string) *server.TcpServer {
+// 	var err error
+// 	h, err := route.NewRouter()
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	svropt := &server.TcpServerOptions{
+// 		AuthPublicKey:    pk,
+// 		ListenAddr:       listenAt,
+// 		OnSessionMessage: h.OnSessionMessage,
+// 		OnSessionStatus:  h.OnSessionStatus,
+// 	}
+// 	svr, err := server.NewTcpServer(svropt)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	return svr
+// }
 
 func start2(pk *rsa.PrivateKey) *server.TcpClient {
 	jwt, _ := auth.GenerateToken(pk, &auth.UserInfo{
@@ -140,9 +159,9 @@ func start2(pk *rsa.PrivateKey) *server.TcpClient {
 	}, 24*time.Hour)
 
 	opts := &server.TcpClientOptions{
-		RemoteAddress:        "localhost:8080",
-		AuthToken:            jwt,
-		ReconnectDelaySecond: 10,
+		RemoteAddress:     "localhost:8080",
+		AuthToken:         jwt,
+		ReconnectDelaySec: 10,
 
 		OnMessage: func(s *server.TcpClient, m *server.MsgWraper) {
 		},
@@ -211,9 +230,9 @@ func conn2(pk *rsa.PrivateKey) *server.TcpClient {
 	}, 24*time.Hour)
 
 	opts := &server.TcpClientOptions{
-		RemoteAddress:        "localhost:8080",
-		AuthToken:            jwt,
-		ReconnectDelaySecond: 10,
+		RemoteAddress:     "localhost:8080",
+		AuthToken:         jwt,
+		ReconnectDelaySec: 10,
 
 		OnMessage: func(s *server.TcpClient, m *server.MsgWraper) {
 		},
