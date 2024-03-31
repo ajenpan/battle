@@ -9,9 +9,8 @@ import (
 
 	"github.com/ajenpan/battle"
 	bf "github.com/ajenpan/battle"
+	"github.com/ajenpan/battle/log"
 	"github.com/ajenpan/battle/msg"
-	"github.com/ajenpan/surf/log"
-	"github.com/ajenpan/surf/server"
 )
 
 type TableOption struct {
@@ -262,21 +261,21 @@ func (d *Table) GetPlayer(uid uint32) *Player {
 	return nil
 }
 
-func (d *Table) OnPlayerJoin(s server.Session, uid uint32) {
+func (d *Table) OnPlayerJoin( /*s session,*/ uid uint32) {
 	d.PushAction(func() {
 		player := d.GetPlayer(uid)
 		if player == nil {
 			return
 		}
 
-		player.sender = func(raw *bf.PlayerMsg) error {
-			wrap := &msg.BattleMessageWrap{
-				BattleId: d.GetID(),
-				Head:     raw.Head,
-				Body:     raw.Body,
-			}
-			return s.SendAsync(player.Uid, wrap)
-		}
+		// player.sender = func(raw *bf.PlayerMsg) error {
+		// 	wrap := &msg.BattleMessageWrap{
+		// 		BattleId: d.GetID(),
+		// 		Head:     raw.Head,
+		// 		Body:     raw.Body,
+		// 	}
+		// return s.SendAsync(player.Uid, wrap)
+		// }
 
 		player.status = battle.PlayerStatus_Joined
 		d.onPlayerStatusChange(player, battle.PlayerStatus_Joined)

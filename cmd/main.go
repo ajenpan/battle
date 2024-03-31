@@ -2,24 +2,18 @@ package main
 
 import (
 	"bytes"
-	"crypto/rsa"
 	"fmt"
 	"os"
 	"runtime"
-	"time"
 
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
 
-	"github.com/ajenpan/surf"
-	"github.com/ajenpan/surf/auth"
-	"github.com/ajenpan/surf/log"
-	"github.com/ajenpan/surf/server"
-	"github.com/ajenpan/surf/utils/rsagen"
-	utilSignal "github.com/ajenpan/surf/utils/signal"
-
-	"github.com/ajenpan/battle/handler"
-	"github.com/ajenpan/battle/msg"
+	// "github.com/ajenpan/surf"
+	// "github.com/ajenpan/surf/auth"
+	// "github.com/ajenpan/surf/server"
+	"github.com/ajenpan/battle/log"
+	utilSignal "github.com/ajenpan/battle/utils/signal"
 
 	_ "github.com/ajenpan/battle/logic/niuniu"
 )
@@ -92,40 +86,38 @@ func RealMain(c *cli.Context) error {
 	}
 	PrintConf(DefaultConf)
 
-	pk, err := rsagen.LoadRsaPrivateKeyFromFile("private.pem")
-	if err != nil {
-		return err
-	}
+	// pk, err := rsagen.LoadRsaPrivateKeyFromFile("private.pem")
+	// if err != nil {
+	// 	return err
+	// }
+	// usr1, _ := auth.GenerateToken(pk, &auth.UserInfo{
+	// 	UId:   10001,
+	// 	UName: "user1",
+	// 	URole: "user",
+	// }, 2400*time.Hour)
+	// fmt.Println(usr1)
 
-	usr1, _ := auth.GenerateToken(pk, &auth.UserInfo{
-		UId:   10001,
-		UName: "user1",
-		URole: "user",
-	}, 2400*time.Hour)
-	fmt.Println(usr1)
+	// jwt, _ := auth.GenerateToken(pk, &auth.UserInfo{
+	// 	UId:   battleuid,
+	// 	UName: "battle1",
+	// 	URole: "battle",
+	// }, 2400*time.Hour)
 
-	jwt, _ := auth.GenerateToken(pk, &auth.UserInfo{
-		UId:   battleuid,
-		UName: "battle1",
-		URole: "battle",
-	}, 2400*time.Hour)
+	// bh := handler.New()
+	// opts := &surf.Options{
+	// 	JWToken:    jwt,
+	// 	RouteAddrs: DefaultConf.RouteAddrs,
+	// 	UnhandleFunc: func(s *server.TcpClient, m *server.MsgWraper) {
+	// 		log.Infof("recv unhandle msg: %v", m)
+	// 	},
+	// }
 
-	bh := handler.New()
-	opts := &surf.Options{
-		JWToken:    jwt,
-		RouteAddrs: DefaultConf.RouteAddrs,
-		UnhandleFunc: func(s *server.TcpClient, m *server.MsgWraper) {
-			log.Infof("recv unhandle msg: %v", m)
-		},
-	}
-	core := surf.New(opts)
-
-	surf.RegisterRequestHandle(core, "ReqStartBattle", bh.OnReqStartBattle)
-	surf.RegisterRequestHandle(core, "ReqJoinBattle", bh.OnReqJoinBattle)
-	surf.RegisterAysncHandle(core, "BattleMessageWrap", bh.OnBattleMessageWrap)
-
-	core.Start()
-	defer core.Stop()
+	// core := surf.New(opts)
+	// surf.RegisterRequestHandle(core, "ReqStartBattle", bh.OnReqStartBattle)
+	// surf.RegisterRequestHandle(core, "ReqJoinBattle", bh.OnReqJoinBattle)
+	// surf.RegisterAysncHandle(core, "BattleMessageWrap", bh.OnBattleMessageWrap)
+	// core.Start()
+	// defer core.Stop()
 
 	s := utilSignal.WaitShutdown()
 	log.Infof("recv signal: %v", s.String())
@@ -151,142 +143,142 @@ func RealMain(c *cli.Context) error {
 // 	return svr
 // }
 
-func start2(pk *rsa.PrivateKey) *server.TcpClient {
-	jwt, _ := auth.GenerateToken(pk, &auth.UserInfo{
-		UId:   1010002,
-		UName: "user1010002",
-		URole: "User",
-	}, 24*time.Hour)
+// func start2(pk *rsa.PrivateKey) *server.TcpClient {
+// 	jwt, _ := auth.GenerateToken(pk, &auth.UserInfo{
+// 		UId:   1010002,
+// 		UName: "user1010002",
+// 		URole: "User",
+// 	}, 24*time.Hour)
 
-	opts := &server.TcpClientOptions{
-		RemoteAddress:     "localhost:8080",
-		AuthToken:         jwt,
-		ReconnectDelaySec: 10,
+// 	opts := &server.TcpClientOptions{
+// 		RemoteAddress:     "localhost:8080",
+// 		AuthToken:         jwt,
+// 		ReconnectDelaySec: 10,
 
-		OnMessage: func(s *server.TcpClient, m *server.MsgWraper) {
-		},
-		OnStatus: func(s *server.TcpClient, enable bool) {
-			if enable {
-				req := &msg.ReqStartBattle{
-					LogicName:    "niuniu",
-					LogicVersion: "1.0.0",
-					// CallbackUrl:  "node://1234",
-					BattleConf: &msg.BattleConfig{
-						BattleId: 1001,
-					},
-					LogicConf: []byte("{}"),
-					PlayerInfos: []*msg.PlayerInfo{
-						{
-							Uid:       1001,
-							SeatId:    1,
-							MainScore: 1000,
-						},
-						{
-							Uid:       1002,
-							SeatId:    2,
-							MainScore: 1000,
-						},
-					},
-				}
-				// s.Send(&server.Message{})
-				s.SendReqMsg(110002, req, server.NewTcpRespCallbackFunc(func(c server.Session, resp *msg.RespStartBattle, err error) {
-					if err != nil {
-						log.Errorf("send req failed: %v", err)
-						return
-					}
-					log.Infof("recv resp: %v", resp)
+// 		OnMessage: func(s *server.TcpClient, m *server.MsgWraper) {
+// 		},
+// 		OnStatus: func(s *server.TcpClient, enable bool) {
+// 			if enable {
+// 				req := &msg.ReqStartBattle{
+// 					LogicName:    "niuniu",
+// 					LogicVersion: "1.0.0",
+// 					// CallbackUrl:  "node://1234",
+// 					BattleConf: &msg.BattleConfig{
+// 						BattleId: 1001,
+// 					},
+// 					LogicConf: []byte("{}"),
+// 					PlayerInfos: []*msg.PlayerInfo{
+// 						{
+// 							Uid:       1001,
+// 							SeatId:    1,
+// 							MainScore: 1000,
+// 						},
+// 						{
+// 							Uid:       1002,
+// 							SeatId:    2,
+// 							MainScore: 1000,
+// 						},
+// 					},
+// 				}
+// 				// s.Send(&server.Message{})
+// 				s.SendReqMsg(110002, req, server.NewTcpRespCallbackFunc(func(c server.Session, resp *msg.RespStartBattle, err error) {
+// 					if err != nil {
+// 						log.Errorf("send req failed: %v", err)
+// 						return
+// 					}
+// 					log.Infof("recv resp: %v", resp)
 
-					if resp.BattleId != 0 {
-						req := &msg.ReqJoinBattle{
-							BattleId: resp.BattleId,
-						}
-						s.SendReqMsg(110002, req, server.NewTcpRespCallbackFunc(func(c server.Session, resp *msg.RespJoinBattle, err error) {
-							if err != nil {
-								log.Errorf("send req failed: %v", err)
-								return
-							}
-							log.Infof("recv resp: %v", resp)
-						}))
+// 					if resp.BattleId != 0 {
+// 						req := &msg.ReqJoinBattle{
+// 							BattleId: resp.BattleId,
+// 						}
+// 						s.SendReqMsg(110002, req, server.NewTcpRespCallbackFunc(func(c server.Session, resp *msg.RespJoinBattle, err error) {
+// 							if err != nil {
+// 								log.Errorf("send req failed: %v", err)
+// 								return
+// 							}
+// 							log.Infof("recv resp: %v", resp)
+// 						}))
 
-					}
+// 					}
 
-				}))
-			}
-		},
-	}
+// 				}))
+// 			}
+// 		},
+// 	}
 
-	client := server.NewTcpClient(opts)
+// 	client := server.NewTcpClient(opts)
 
-	return client
-}
+// 	return client
+// }
 
-func conn2(pk *rsa.PrivateKey) *server.TcpClient {
-	myuid := uint32(1002)
+// func conn2(pk *rsa.PrivateKey) *server.TcpClient {
+// 	myuid := uint32(1002)
 
-	jwt, _ := auth.GenerateToken(pk, &auth.UserInfo{
-		UId:   myuid,
-		UName: "user2",
-		URole: "User",
-	}, 24*time.Hour)
+// 	jwt, _ := auth.GenerateToken(pk, &auth.UserInfo{
+// 		UId:   myuid,
+// 		UName: "user2",
+// 		URole: "User",
+// 	}, 24*time.Hour)
 
-	opts := &server.TcpClientOptions{
-		RemoteAddress:     "localhost:8080",
-		AuthToken:         jwt,
-		ReconnectDelaySec: 10,
+// 	opts := &server.TcpClientOptions{
+// 		RemoteAddress:     "localhost:8080",
+// 		AuthToken:         jwt,
+// 		ReconnectDelaySec: 10,
 
-		OnMessage: func(s *server.TcpClient, m *server.MsgWraper) {
-		},
-		OnStatus: func(s *server.TcpClient, enable bool) {
-			log.Debug("OnStatus: ", enable)
-			if !enable {
-				return
-			}
-			req := &msg.ReqStartBattle{
-				LogicName:    "niuniu",
-				LogicVersion: "1.0.0",
-				// CallbackUrl:  "node://1234",
-				BattleConf: &msg.BattleConfig{
-					BattleId: 1001,
-				},
-				LogicConf: []byte("{}"),
-				PlayerInfos: []*msg.PlayerInfo{
-					{
-						Uid:       myuid,
-						SeatId:    1,
-						MainScore: 1000,
-					},
-					{
-						Uid:       2,
-						SeatId:    2,
-						Role:      1,
-						MainScore: 1000,
-					},
-				},
-			}
-			s.SendReqMsg(battleuid, req, server.NewTcpRespCallbackFunc(func(c server.Session, resp *msg.RespStartBattle, err error) {
-				if err != nil {
-					log.Errorf("send req failed: %v", err)
-					return
-				}
-				log.Infof("recv resp: %v", resp)
+// 		OnMessage: func(s *server.TcpClient, m *server.MsgWraper) {
+// 		},
+// 		OnStatus: func(s *server.TcpClient, enable bool) {
+// 			log.Debug("OnStatus: ", enable)
+// 			if !enable {
+// 				return
+// 			}
+// 			req := &msg.ReqStartBattle{
+// 				LogicName:    "niuniu",
+// 				LogicVersion: "1.0.0",
+// 				// CallbackUrl:  "node://1234",
+// 				BattleConf: &msg.BattleConfig{
+// 					BattleId: 1001,
+// 				},
+// 				LogicConf: []byte("{}"),
+// 				PlayerInfos: []*msg.PlayerInfo{
+// 					{
+// 						Uid:       myuid,
+// 						SeatId:    1,
+// 						MainScore: 1000,
+// 					},
+// 					{
+// 						Uid:       2,
+// 						SeatId:    2,
+// 						Role:      1,
+// 						MainScore: 1000,
+// 					},
+// 				},
+// 			}
+// 			s.SendReqMsg(battleuid, req, server.NewTcpRespCallbackFunc(func(c server.Session, resp *msg.RespStartBattle, err error) {
+// 				if err != nil {
+// 					log.Errorf("send req failed: %v", err)
+// 					return
+// 				}
+// 				log.Infof("recv resp: %v", resp)
 
-				if resp.BattleId != 0 {
-					req := &msg.ReqJoinBattle{
-						BattleId: resp.BattleId,
-					}
-					s.SendReqMsg(battleuid, req, server.NewTcpRespCallbackFunc(func(c server.Session, resp *msg.RespJoinBattle, err error) {
-						if err != nil {
-							log.Errorf("send req failed: %v", err)
-							return
-						}
-						log.Infof("recv resp: %v", resp)
-					}))
-				}
-			}))
-		},
-	}
+// 				if resp.BattleId != 0 {
+// 					req := &msg.ReqJoinBattle{
+// 						BattleId: resp.BattleId,
+// 					}
+// 					s.SendReqMsg(battleuid, req, server.NewTcpRespCallbackFunc(func(c server.Session, resp *msg.RespJoinBattle, err error) {
+// 						if err != nil {
+// 							log.Errorf("send req failed: %v", err)
+// 							return
+// 						}
+// 						log.Infof("recv resp: %v", resp)
+// 					}))
+// 				}
+// 			}))
+// 		},
+// 	}
 
-	client := server.NewTcpClient(opts)
+// 	client := server.NewTcpClient(opts)
 
-	return client
-}
+// 	return client
+// }

@@ -7,8 +7,6 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ajenpan/surf"
-
 	bf "github.com/ajenpan/battle"
 	"github.com/ajenpan/battle/msg"
 	"github.com/ajenpan/battle/table"
@@ -22,6 +20,12 @@ type Handler struct {
 	createCounter uint64
 }
 
+type User interface {
+	UId() uint32
+
+	Send(proto.Message) error
+}
+
 func New() *Handler {
 	h := &Handler{
 		Creator: bf.DefaultLoigcCreator,
@@ -32,7 +36,7 @@ func New() *Handler {
 	return h
 }
 
-func (h *Handler) OnReqStartBattle(s *surf.Context, in *msg.ReqStartBattle) (*msg.RespStartBattle, error) {
+func (h *Handler) OnReqStartBattle(s User, in *msg.ReqStartBattle) (*msg.RespStartBattle, error) {
 	if len(in.PlayerInfos) == 0 {
 		return nil, fmt.Errorf("player info is empty")
 	}
@@ -88,7 +92,7 @@ func (h *Handler) OnReqStartBattle(s *surf.Context, in *msg.ReqStartBattle) (*ms
 	return out, nil
 }
 
-func (h *Handler) OnReqStopBattle(s *surf.Context, in *msg.ReqStopBattle) (*msg.RespStopBattle, error) {
+func (h *Handler) OnReqStopBattle(s User, in *msg.ReqStopBattle) (*msg.RespStopBattle, error) {
 	out := &msg.RespStopBattle{}
 
 	d := h.GetBattleById(in.BattleId)
@@ -101,29 +105,28 @@ func (h *Handler) OnReqStopBattle(s *surf.Context, in *msg.ReqStopBattle) (*msg.
 	return out, nil
 }
 
-func (h *Handler) OnReqJoinBattle(s *surf.Context, in *msg.ReqJoinBattle) (*msg.RespJoinBattle, error) {
+func (h *Handler) OnReqJoinBattle(s User, in *msg.ReqJoinBattle) (*msg.RespJoinBattle, error) {
 	b := h.GetBattleById(in.BattleId)
 	if b == nil {
 		return nil, fmt.Errorf("battle not found")
 	}
-
-	b.OnPlayerJoin(s.Session, s.UId)
+	// b.OnPlayerJoin(s,  s.Uid())
 	//h.player2Battles.AddPlayerBattle(s.UId, in.BattleId)
 	return nil, nil
 }
 
-func (h *Handler) OnReqQuitBattle(s *surf.Context, in *msg.ReqQuitBattle) (*msg.RespQuitBattle, error) {
+func (h *Handler) OnReqQuitBattle(s User, in *msg.ReqQuitBattle) (*msg.RespQuitBattle, error) {
 	b := h.GetBattleById(in.BattleId)
 	if b == nil {
 		return nil, fmt.Errorf("battle not found")
 	}
-	b.OnPlayerQuit(s.UId)
+	b.OnPlayerQuit(s.UId())
 	//h.player2Battles.RemovePlayerBattle(s.UId, in.BattleId)
 	return nil, nil
 }
 
-func (h *Handler) OnBattleMessageWrap(s *surf.Context, msg *msg.BattleMessageWrap) {
-	uid := (s.UId)
+func (h *Handler) OnBattleMessageWrap(s User, msg *msg.BattleMessageWrap) {
+	uid := (s.UId())
 	b := h.GetBattleById(msg.BattleId)
 	if b == nil {
 		return
@@ -132,7 +135,6 @@ func (h *Handler) OnBattleMessageWrap(s *surf.Context, msg *msg.BattleMessageWra
 		Head: msg.Head,
 		Body: msg.Body,
 	})
-
 }
 
 func (h *Handler) GetBattleById(battleId uint64) *table.Table {

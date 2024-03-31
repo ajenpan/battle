@@ -7,14 +7,14 @@ import (
 	reflect "reflect"
 	"time"
 
+	"github.com/ajenpan/battle/log"
 	nncard "github.com/ajenpan/poker_algorithm/niuniu"
-	"github.com/ajenpan/surf/log"
 	protobuf "google.golang.org/protobuf/proto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 
 	bf "github.com/ajenpan/battle"
 
-	ct "github.com/ajenpan/surf/utils/calltable"
+	ct "github.com/ajenpan/battle/utils/calltable"
 )
 
 func init() {
