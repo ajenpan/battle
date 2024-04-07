@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package battle;
+
+option go_package = ".;msg";
+option csharp_namespace = "battle";
+
+service Battle {
+  rpc StartBattle(ReqStartBattle) returns (RespStartBattle) {}
+}
+
+enum PlayerRoleType {
+  Player = 0;
+  Robot = 1;
+}
+
+message PlayerInfo {
+  uint32 uid = 1;
+  int32 seat_id = 2;
+  PlayerRoleType role = 3;
+  int64 main_score = 4;
+  map<int32, int64> sub_scores = 5;
+  map<string, string> extra = 6;
+}
+
+message BattleConfig {
+  int32 max_battle_time = 1;
+}
+
+message ReqStartBattle {
+  BattleConfig battle_conf = 1;
+  string logic_name = 2;
+  string logic_version = 3;
+  bytes logic_conf = 4;
+  bytes logic_context = 5;
+  repeated PlayerInfo player_infos = 6;
+  string callback_url = 7;
+}
+
+message RespStartBattle {
+  uint64 battle_id = 1;
+}
+
+message EventBattleStarted {
+  uint64 battleid = 1;
+}
+
+message TallyInfo {
+  message PlayerTally {
+    uint32 uid = 1;
+    int32 seat_id = 2;
+    bytes logdata = 3;
+    int64 main_score = 4;
+    map<int32, int64> sub_scores = 5;
+    map<string, string> extra = 6;
+  }
+  repeated PlayerTally detals = 1;
+}
+
+message EventBattleOver {
+  enum OverType {
+    Normal = 0;
+    Timeout = 1;
+    Disbanded = 2; // 解散
+  }
+  uint64 battleid = 1;
+  OverType over_type = 2;
+  TallyInfo tallys = 3;
+}

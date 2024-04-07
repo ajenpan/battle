@@ -1,17 +1,16 @@
 package noop
 
-// import (
-// 	"time"
+import (
+	battle "github.com/ajenpan/battle"
+)
 
-// 	battle "github.com/ajenpan/battle"
-// )
+func NewGameLogic() battle.Logic {
+	return &GameLogic{}
+}
 
-// func NewGameLogic() battle.Battle {
-// 	return &GameLogic{}
-// }
-
-// type GameLogic struct {
-// }
+type GameLogic struct {
+	battle.Logic
+}
 
 // func (gl *GameLogic) OnInit(battle.Table, interface{}) error {
 // 	return nil
@@ -24,7 +23,7 @@ package noop
 // func (gl *GameLogic) OnStart() error {
 // 	return nil
 // }
-// func (gl *GameLogic) OnTick(time.Duration) {
+// func (gl *GameLogic) OnTick( ) {
 
 // }
 // func (gl *GameLogic) OnReset() {

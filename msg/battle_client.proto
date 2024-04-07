@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package battle;
+
+option go_package = ".;msg";
+option csharp_namespace = "battle";
+
+message ReqJoinBattle {
+  int32 ready_state = 1;
+}
+
+message RespJoinBattle {}
+
+message ReqQuitBattle {}
+
+message RespQuitBattle {}
+
+message MsgToClient {
+  int32 msgid = 1;
+  bytes body = 2;
+}
+
+message MsgToLogic {
+  int32 msgid = 1;
+  bytes body = 2;
+}
+
+message BattleMessageWrap {
+  uint64 battleid = 1;
+
+  oneof payload {
+    ReqJoinBattle req_join = 2;
+    RespJoinBattle resp_join = 3;
+    ReqQuitBattle req_quit = 4;
+    RespQuitBattle resp_quit = 5;
+    MsgToClient to_client = 6;
+    MsgToLogic to_logic = 7;
+  }
+}

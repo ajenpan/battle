@@ -6,7 +6,6 @@ import (
 	protobuf "google.golang.org/protobuf/proto"
 
 	"github.com/ajenpan/battle"
-	bf "github.com/ajenpan/battle"
 	pb "github.com/ajenpan/battle/msg"
 )
 
@@ -25,9 +24,9 @@ func NewPlayers(infos []*pb.PlayerInfo) ([]*Player, error) {
 
 	// check seatid
 	for _, v := range ret {
-		if v.SeatId == 0 {
-			return nil, fmt.Errorf("seat id is 0")
-		}
+		// if v.SeatId == 0 {
+		// 	return nil, fmt.Errorf("seat id is 0")
+		// }
 		if v.Uid == 0 {
 			return nil, fmt.Errorf("uid is 0")
 		}
@@ -38,18 +37,16 @@ func NewPlayers(infos []*pb.PlayerInfo) ([]*Player, error) {
 
 type Player struct {
 	*pb.PlayerInfo
-
-	battleid string
-	sender   func(msg *bf.PlayerMsg) error
-
-	status battle.PlayerStatusType
+	battleid    uint64
+	send2client func(msg *battle.PlayerMsg) error
+	status      battle.PlayerStatusType
 }
 
 func (p *Player) GetScore() int64 {
 	return p.PlayerInfo.MainScore
 }
 
-func (p *Player) GetBattleID() string {
+func (p *Player) GetBattleID() uint64 {
 	return p.battleid
 }
 
@@ -60,25 +57,26 @@ func (p *Player) GetUID() uint32 {
 func (ps *Player) SetStatus(s battle.PlayerStatusType) {
 	ps.status = s
 }
+
 func (ps *Player) GetStatus() battle.PlayerStatusType {
 	return ps.status
 }
 
-func (p *Player) GetSeatID() uint32 {
+func (p *Player) GetSeatID() int32 {
 	return p.PlayerInfo.SeatId
 }
 
-func (p *Player) GetRole() uint32 {
-	return uint32(p.PlayerInfo.Role)
+func (p *Player) GetRole() int32 {
+	return int32(p.PlayerInfo.Role)
 }
 
-func (p *Player) Send(msg *bf.PlayerMsg) error {
-	if p.sender == nil {
+func (p *Player) Send(msg *battle.PlayerMsg) error {
+	if p.send2client == nil {
 		return fmt.Errorf("sender is nil")
 	}
-	return p.sender(msg)
+	return p.send2client(msg)
 }
 
-func (p *Player) SetSender(f func(*bf.PlayerMsg) error) {
-	p.sender = f
+func (p *Player) SetSender(f func(*battle.PlayerMsg) error) {
+	p.send2client = f
 }

@@ -42,7 +42,7 @@ message OutCardInfo {
 }
 
 message PlayerInfo {
-  uint32 seat_id = 1;
+  int32 seat_id = 1;
   GameStatus status = 2;
   int32 ready = 3;
   int32 banker_rob = 4; // 抢庄
@@ -68,7 +68,7 @@ message GameInfoResponse {
 message NotifyGameStatusChange {
   GameStatus before_status = 1; // 游戏状态
   GameStatus curr_status = 2;
-  uint32 status_at = 3; // 状态开始时间戳
+  int32 status_at = 3;  // 状态开始时间戳
   int32 count_down = 4; // 倒计时
 }
 
@@ -79,13 +79,13 @@ message PlayerRobBankerReport {
 
 // 广播抢庄用户
 message NotifyPlayerRobBanker {
-  uint32 seat_id = 1;
+  int32 seat_id = 1;
   int32 rob = 2;
 }
 
 // 广播庄家位置
 message NotifyBankerSeat {
-  uint32 seat_id = 1;
+  int32 seat_id = 1;
 }
 
 // 闲家下注
@@ -95,13 +95,13 @@ message PlayerBetRateReport {
 
 // 广播闲家下注倍率信息
 message NotifyPlayerBetRate {
-  uint32 seat_id = 1;
+  int32 seat_id = 1;
   int32 rate = 2;
 }
 
 // 通知用户手牌信息
 message NotifyPlayerHandCards {
-  uint32 seat_id = 1;
+  int32 seat_id = 1;
   bytes hand_cards = 2;
 }
 
@@ -112,14 +112,14 @@ message PlayerOutCardReport {
 
 // 广播用户出牌结果
 message NotifyPlayerOutCard {
-  uint32 seat_id = 1;
+  int32 seat_id = 1;
   OutCardInfo out_card = 2;
 }
 
 // 游戏结算
 message NotifyGameTally {
   message TallyInfo {
-    uint32 seat_id = 1;
+    int32 seat_id = 1;
     int32 coins = 2;
   }
   repeated TallyInfo tall_info = 2; // 用户输户赢信息

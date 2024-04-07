@@ -39,12 +39,7 @@ func longVersion() string {
 }
 
 func main() {
-	if err := Run(); err != nil {
-		fmt.Println(err)
-	}
-}
 
-func Run() error {
 	cli.VersionPrinter = func(c *cli.Context) {
 		fmt.Println(longVersion())
 	}
@@ -53,7 +48,10 @@ func Run() error {
 	app.Name = Name
 	app.Action = RealMain
 	err := app.Run(os.Args)
-	return err
+
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 type Config struct {

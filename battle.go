@@ -13,17 +13,19 @@ const (
 	RoleType_Robot  RoleType = iota
 )
 
-type GameStatus int16
+type GameStatus = int32
 
 const (
-	GameStatus_Idle    GameStatus = iota
-	GameStatus_Started GameStatus = iota
-	GameStatus_Over    GameStatus = iota
+	GameStatus_Idle     GameStatus = iota
+	GameStatus_Starting GameStatus = iota
+	GameStatus_Started  GameStatus = iota
+	GameStatus_Closing  GameStatus = iota
+	GameStatus_Over     GameStatus = iota
 )
 
 type PlayerMsg struct {
-	Head []byte
-	Body []byte
+	Msgid int32
+	Body  []byte
 }
 
 type PlayerStatusType int16
@@ -39,18 +41,23 @@ type PlayerSession interface {
 	Send(*PlayerMsg) error
 }
 
+type User interface {
+	UId() uint32
+	Role() int32
+	Send(proto.Message) error
+}
+
 type Player interface {
 	GetUID() uint32
-	GetRole() uint32
-	GetSeatID() uint32
+	GetRole() int32
+	GetSeatID() int32
 	GetScore() int64
-
-	SetStatus(PlayerStatusType)
 	GetStatus() PlayerStatusType
 
-	// 必须通过table 来发送消息, 这样 table 可以做一些统一的处理, 比如回放等等
-	// Send(*PlayerMsg) error
-	SetSender(func(*PlayerMsg) error)
+	SetStatus(PlayerStatusType)
+}
+
+type TallyInfo struct {
 }
 
 type Table interface {
@@ -58,19 +65,24 @@ type Table interface {
 	SendPlayerMessage(Player, *PlayerMsg)
 	BroadcastPlayerMessage(*PlayerMsg)
 
-	ReportBattleStatus(GameStatus)
+	ReportGameStarted()
+	ReportGameTally(*TallyInfo)
+	ReportGameOver()
+
 	ReportBattleEvent(event proto.Message)
 
 	AfterFunc(func())
 
-	OnPlayerMessage(uid uint32, m *PlayerMsg)
+	// SendEvent()
 }
 
 type Logic interface {
 	OnInit(c Table, players []Player, conf interface{}) error
 
+	OnStart()
+	OnClose()
+
 	OnTick(time.Duration)
-	OnReset()
 
 	OnPlayerMessage(Player, *PlayerMsg)
 	OnPlayerStatus(Player, PlayerStatusType)

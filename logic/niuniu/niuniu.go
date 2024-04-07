@@ -12,21 +12,20 @@ import (
 	protobuf "google.golang.org/protobuf/proto"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 
-	bf "github.com/ajenpan/battle"
-
+	"github.com/ajenpan/battle"
 	ct "github.com/ajenpan/battle/utils/calltable"
 )
 
 func init() {
-	bf.RegisterLogic("niuniu", "1.0.0", NewLogic)
+	battle.RegisterLogic("niuniu", "1.0.0", NewLogic)
 
 	file_niuniu_proto_init()
-	g_ct = extractCallMethod(File_niuniu_proto.Messages(), New())
+	// g_ct = extractCallMethod(File_niuniu_proto.Messages(), New())
 }
 
-var g_ct *ct.CallTable[string]
+var g_ct *ct.CallTable[int32]
 
-func NewLogic() bf.Logic {
+func NewLogic() battle.Logic {
 	return New()
 }
 
@@ -96,7 +95,7 @@ func GetMessageMsgID(msg protoreflect.MessageDescriptor) uint32 {
 }
 
 type NNPlayer struct {
-	raw bf.Player
+	raw battle.Player
 	*PlayerInfo
 	rawHandCards *nncard.NNHandCards
 }
@@ -115,7 +114,7 @@ func ParseConfig(raw []byte) (*Config, error) {
 }
 
 type Niuniu struct {
-	table bf.Table
+	table battle.Table
 	conf  *Config
 	log   *log.Logger
 
@@ -132,11 +131,11 @@ type Niuniu struct {
 	joined map[uint16]bool //加入人数
 }
 
-func PBMarshal(msg protobuf.Message) *bf.PlayerMsg {
+func PBMarshal(msg protobuf.Message) *battle.PlayerMsg {
 	fmt.Println("marshal: ", msg)
 	body, _ := protobuf.Marshal(msg)
-	return &bf.PlayerMsg{
-		Head: []byte(msg.ProtoReflect().Descriptor().FullName().Name()),
+	return &battle.PlayerMsg{
+		// Head: []byte(msg.ProtoReflect().Descriptor().FullName().Name()),
 		Body: body,
 	}
 }
@@ -149,19 +148,19 @@ func (nn *Niuniu) Send2Player(p *NNPlayer, msg protobuf.Message) {
 	nn.table.SendPlayerMessage(p.raw, PBMarshal(msg))
 }
 
-func (nn *Niuniu) OnPlayerStatus(players bf.Player, status bf.PlayerStatusType) {
+func (nn *Niuniu) OnPlayerStatus(players battle.Player, status battle.PlayerStatusType) {
 	p := nn.playerConv(players)
 	if p == nil {
 		return
 	}
 
-	if nn.info.Status == GameStatus_IDLE && status == bf.PlayerStatus_Joined {
+	if nn.info.Status == GameStatus_IDLE && status == battle.PlayerStatus_Joined {
 		nn.joined[uint16(p.raw.GetSeatID())] = true
 	}
 
 }
 
-func (nn *Niuniu) OnInit(d bf.Table, ps []bf.Player, conf interface{}) error {
+func (nn *Niuniu) OnInit(d battle.Table, ps []battle.Player, conf interface{}) error {
 	switch v := conf.(type) {
 	case []byte:
 		var err error
@@ -179,36 +178,39 @@ func (nn *Niuniu) OnInit(d bf.Table, ps []bf.Player, conf interface{}) error {
 	nn.gameAge = 0
 
 	for _, v := range ps {
-		if v.GetRole() == uint32(bf.RoleType_Robot) {
-			nn.addRobot(v)
-		} else {
-			_, err := nn.addPlayer(v)
-			if err != nil {
-				return err
-			}
+		_, err := nn.addPlayer(v)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
+
+}
+func (nn *Niuniu) OnStart() {
+	nn.doStart()
+}
+
+func (nn *Niuniu) OnClose() {
+	nn.table.ReportGameTally(&battle.TallyInfo{})
+	nn.table.ReportGameOver()
 }
 
 func (nn *Niuniu) doStart() {
-	nn.table.ReportBattleStatus(bf.GameStatus_Started)
 	nn.ChangeLogicStep(GameStatus_BEGIN)
+	nn.table.ReportGameStarted()
 }
 
 func (nn *Niuniu) OnCommand(topic string, data []byte) {
 
 }
 
-func (nn *Niuniu) OnPlayerMessage(p bf.Player, pmsg *bf.PlayerMsg) {
+func (nn *Niuniu) OnPlayerMessage(p battle.Player, pmsg *battle.PlayerMsg) {
 	if pmsg == nil {
 		return
 	}
-
-	mname := string(pmsg.Head)
-	m := g_ct.Get(mname)
+	m := g_ct.Get(pmsg.Msgid)
 	if m == nil {
-		nn.log.Errorf("can't find method: %s", mname)
+		nn.log.Errorf("can't find method: %d", pmsg.Msgid)
 		return
 	}
 
@@ -291,7 +293,7 @@ func (nn *Niuniu) OnPlayerOutCardRequest(nnPlayer *NNPlayer, pMsg *PlayerOutCard
 	nn.BroadcastMessage(notice)
 }
 
-func (nn *Niuniu) addPlayer(p bf.Player) (*NNPlayer, error) {
+func (nn *Niuniu) addPlayer(p battle.Player) (*NNPlayer, error) {
 	ret := &NNPlayer{}
 	ret.PlayerInfo = &PlayerInfo{}
 	ret.PlayerInfo.SeatId = (p.GetSeatID())
@@ -303,23 +305,23 @@ func (nn *Niuniu) addPlayer(p bf.Player) (*NNPlayer, error) {
 	return ret, nil
 }
 
-func (nn *Niuniu) addRobot(p bf.Player) (*NNPlayer, error) {
-	nnp, err := nn.addPlayer(p)
-	if err != nil {
-		return nil, err
-	}
-	robot := &Robot{
-		NNPlayer: nnp,
-	}
-	p.SetSender(robot.OnMsg)
+// func (nn *Niuniu) addRobot(p battle.Player) (*NNPlayer, error) {
+// 	nnp, err := nn.addPlayer(p)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	robot := &Robot{
+// 		NNPlayer: nnp,
+// 	}
+// 	p.SetSender(robot.OnMsg)
 
-	p.SetStatus(bf.PlayerStatus_Joined)
+// 	p.SetStatus(battle.PlayerStatus_Joined)
 
-	// 机器人自动准备
-	nn.joined[uint16(p.GetSeatID())] = true
+// 	// 机器人自动准备
+// 	nn.joined[uint16(p.GetSeatID())] = true
 
-	return nnp, nil
-}
+// 	return nnp, nil
+// }
 
 func (nn *Niuniu) OnTick(duration time.Duration) {
 	nn.gameAge += duration
@@ -327,9 +329,7 @@ func (nn *Niuniu) OnTick(duration time.Duration) {
 
 	switch nn.getLogicStep() {
 	case GameStatus_IDLE:
-		if len(nn.joined) == len(nn.playerMap) {
-			nn.doStart()
-		}
+
 	case GameStatus_BEGIN:
 		if nn.StepTimeover() {
 			nn.NextStep()
@@ -359,7 +359,7 @@ func (nn *Niuniu) OnTick(duration time.Duration) {
 		nn.NextStep()
 	case GameStatus_OVER:
 		if nn.StepTimeover() {
-			nn.table.ReportBattleStatus(bf.GameStatus_Over)
+			nn.table.ReportGameOver()
 		}
 	default:
 		fmt.Println("unknow step")
@@ -433,14 +433,14 @@ func (nn *Niuniu) ChangeLogicStep(s GameStatus) {
 		BeforeStatus: beforeStatus,
 		CurrStatus:   s,
 		CountDown:    int32(countdown),
-		StatusAt:     uint32(nn.stageStartAt),
+		StatusAt:     int32(nn.stageStartAt),
 	}
 
 	nn.BroadcastMessage(notice)
 	nn.Debug()
 }
 
-func (nn *Niuniu) playerConv(p bf.Player) *NNPlayer {
+func (nn *Niuniu) playerConv(p battle.Player) *NNPlayer {
 	return nn.getPlayerBySeatId(uint16(p.GetSeatID()))
 }
 
@@ -481,7 +481,7 @@ func (nn *Niuniu) notifyRobBanker() {
 		}
 	}
 
-	seats := make([]uint32, 0, len(nn.playerMap))
+	seats := make([]int32, 0, len(nn.playerMap))
 
 	var maxRob int32 = -1
 	for _, p := range nn.playerMap {
@@ -589,16 +589,6 @@ func (nn *Niuniu) beginTally() {
 	// notify.TallInfo = append(notify.TallInfo, bankerTally)
 
 	nn.BroadcastMessage(notify)
-}
-
-func (nn *Niuniu) resetDesk() {
-	nn.playerMap = make(map[uint16]*NNPlayer)
-	for _, p := range nn.playerMap {
-		p.PlayerInfo.Reset()
-		p.PlayerInfo.Status = GameStatus_IDLE
-		p.PlayerInfo.SeatId = p.SeatId
-	}
-	nn.ChangeLogicStep(GameStatus_IDLE)
 }
 
 func (nn *Niuniu) Debug() {

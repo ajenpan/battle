@@ -1,118 +1,102 @@
 package table
 
 import (
-	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ajenpan/battle"
-	bf "github.com/ajenpan/battle"
 	"github.com/ajenpan/battle/log"
 	"github.com/ajenpan/battle/msg"
 )
 
 type TableOption struct {
-	ID     uint64
-	Conf   *msg.BattleConfig
-	Closer func()
+	ID         uint64
+	Conf       *msg.BattleConfig
+	CloserFunc func()
 }
 
-func NewTable(opt TableOption) *Table {
+func NewTable(opt *TableOption) *Table {
+
+	if opt == nil {
+		opt = &TableOption{}
+	}
+
 	ret := &Table{
-		TableOption: &opt,
+		TableOption: opt,
 		CreateAt:    time.Now(),
-		closed:      make(chan struct{}),
+		chClosed:    make(chan struct{}),
 		players:     make(map[uint32]*Player),
 	}
 
-	ret.action = make(chan func(), 100)
+	ret.chAction = make(chan func(), 100)
 
 	if ret.Conf == nil {
 		ret.Conf = &msg.BattleConfig{}
 	}
+
 	if ret.Conf.MaxBattleTime == 0 {
 		ret.Conf.MaxBattleTime = 300
 	}
-
 	return ret
 }
 
 type Table struct {
 	*TableOption
 
+	OverDeadline time.Time
+
 	CreateAt time.Time
 	StartAt  time.Time
 	OverAt   time.Time
 	Age      time.Duration
 
-	logic bf.Logic
+	logic battle.Logic
 
-	// watchers    sync.Map
-	// evenReport
+	rwlock  sync.RWMutex
+	players map[uint32]*Player
 
-	playersRWL sync.RWMutex
-	players    map[uint32]*Player
-
-	action chan func()
-	closed chan struct{}
+	chAction chan func()
+	chClosed chan struct{}
 
 	ticker *time.Ticker
 
-	status bf.GameStatus
+	status battle.GameStatus
 }
 
 func (d *Table) GetID() uint64 {
 	return d.TableOption.ID
 }
 
-func (d *Table) Init(players []*Player, logic bf.Logic, logicConf interface{}) error {
-	d.playersRWL.Lock()
-	defer d.playersRWL.Unlock()
+func (d *Table) Init(players []*Player, logic battle.Logic, logicConf interface{}) error {
+	d.rwlock.Lock()
+	defer d.rwlock.Unlock()
 
-	if d.logic != nil {
-		d.logic.OnReset()
-	}
-
-	battlePlayers := make([]bf.Player, len(players))
+	battlePlayers := make([]battle.Player, len(players))
 	for i, p := range players {
-		// store player
-		// d.players.Store(p.Uid, p)
-
 		d.players[p.Uid] = p
 		battlePlayers[i] = p
 	}
 
-	if err := logic.OnInit(d, battlePlayers, logicConf); err != nil {
-		return err
+	if logic != nil {
+		if err := logic.OnInit(d, battlePlayers, logicConf); err != nil {
+			return err
+		}
 	}
 
 	d.logic = logic
-	return nil
-}
 
-func (d *Table) PushAction(f func()) {
-	d.action <- f
-}
-
-func (d *Table) AfterFunc(f func()) {
-	d.PushAction(f)
-}
-
-func (d *Table) Start() error {
-	d.playersRWL.Lock()
-	defer d.playersRWL.Unlock()
-	if d.logic == nil {
-		return fmt.Errorf("logic not init")
-	}
-
-	if d.ticker != nil {
-		d.ticker.Stop()
-	}
 	d.ticker = time.NewTicker(1 * time.Second)
 
 	go func() {
+		defer func() {
+			d.ticker.Stop()
+			d.ticker = nil
+
+		}()
+
 		safecall := func(f func()) {
 			defer func() {
 				if err := recover(); err != nil {
@@ -123,11 +107,12 @@ func (d *Table) Start() error {
 		}
 
 		latest := time.Now()
+
 		for {
 			select {
-			case <-d.closed:
+			case <-d.chClosed:
 				return
-			case job, ok := <-d.action:
+			case job, ok := <-d.chAction:
 				if !ok {
 					return
 				}
@@ -144,77 +129,66 @@ func (d *Table) Start() error {
 	return nil
 }
 
+func (d *Table) PushAction(f func()) {
+	d.chAction <- f
+}
+
+func (d *Table) AfterFunc(f func()) {
+	d.PushAction(f)
+}
+
 func (d *Table) onTick(detle time.Duration) {
 	d.Age += detle
 
-	d.logic.OnTick(detle)
+	if d.logic != nil {
+		d.logic.OnTick(detle)
+	}
 
-	switch d.status {
-	case bf.GameStatus_Idle:
+	switch d.GetStatus() {
+	case battle.GameStatus_Idle:
 		if d.Age > 10*time.Second {
-			// Do fouce close
-			fmt.Println("ready timeout")
+			d.StartGame()
 		}
-	case bf.GameStatus_Started:
+	case battle.GameStatus_Started:
 		if d.Age > time.Duration(d.Conf.MaxBattleTime)*time.Second {
-			// Do fouce close
-			fmt.Println("game ready timeout")
-			d.Close()
+			d.CloseGame()
 		}
 	default:
 	}
 }
 
-func (d *Table) Close() {
+func (d *Table) close() {
+	d.rwlock.Lock()
+	defer d.rwlock.Unlock()
+
 	select {
-	case <-d.closed:
+	case <-d.chClosed:
 		return
 	default:
-		close(d.closed)
+		close(d.chClosed)
 	}
-
-	// if d.logic != nil {
-	// 	d.logic.OnReset()
-	// }
 
 	if d.ticker != nil {
 		d.ticker.Stop()
 	}
 
-	close(d.action)
+	close(d.chAction)
 
-	d.Closer()
-}
-
-func (d *Table) ReportBattleStatus(s bf.GameStatus) {
-	if d.status == s {
-		return
-	}
-
-	statusBefore := d.status
-	d.status = s
-
-	event := &msg.EventBattleStatusChange{
-		StatusBefore: int32(statusBefore),
-		StatusNow:    int32(s),
-		BattleId:     d.GetID(),
-	}
-	d.PublishEvent(event)
-
-	switch s {
-	case bf.GameStatus_Idle:
-	case bf.GameStatus_Started:
-		d.reportGameStart()
-	case bf.GameStatus_Over:
-		d.reportGameOver()
+	if d.CloserFunc != nil {
+		d.CloserFunc()
 	}
 }
 
-func (d *Table) ReportBattleEvent(event proto.Message) {
-	d.PublishEvent(event)
+func (d *Table) GetStatus() battle.GameStatus {
+	return atomic.LoadInt32(&d.status)
 }
 
-func (d *Table) SendPlayerMessage(p bf.Player, msg *bf.PlayerMsg) {
+func (d *Table) UpdateStatus(s battle.GameStatus) bool {
+	old := atomic.SwapInt32(&d.status, s)
+	return old != s
+}
+
+func (d *Table) SendPlayerMessage(p battle.Player, msg *battle.PlayerMsg) {
 	rp, ok := p.(*Player)
 	if !ok {
 		log.Error("player is not Player")
@@ -226,9 +200,9 @@ func (d *Table) SendPlayerMessage(p bf.Player, msg *bf.PlayerMsg) {
 	}
 }
 
-func (d *Table) BroadcastPlayerMessage(msg *bf.PlayerMsg) {
-	d.playersRWL.RLock()
-	defer d.playersRWL.RUnlock()
+func (d *Table) BroadcastPlayerMessage(msg *battle.PlayerMsg) {
+	d.rwlock.RLock()
+	defer d.rwlock.RUnlock()
 
 	for _, p := range d.players {
 		err := p.Send(msg)
@@ -239,59 +213,26 @@ func (d *Table) BroadcastPlayerMessage(msg *bf.PlayerMsg) {
 }
 
 func (d *Table) IsPlaying() bool {
-	return d.status == bf.GameStatus_Started
+	return d.status == battle.GameStatus_Started
 }
 
-func (d *Table) reportGameStart() {
-	d.StartAt = time.Now()
-	d.PublishEvent(&msg.EventBattleStart{})
-}
-
-func (d *Table) reportGameOver() {
-	d.OverAt = time.Now()
-	d.PublishEvent(&msg.EventBattleOver{})
+func (d *Table) ReportBattleEvent(event proto.Message) {
+	d.PublishEvent(event)
 }
 
 func (d *Table) GetPlayer(uid uint32) *Player {
-	d.playersRWL.RLock()
-	defer d.playersRWL.RUnlock()
+	d.rwlock.RLock()
+	defer d.rwlock.RUnlock()
 	if p, has := d.players[uid]; has {
 		return p
 	}
 	return nil
 }
 
-func (d *Table) OnPlayerJoin( /*s session,*/ uid uint32) {
-	d.PushAction(func() {
-		player := d.GetPlayer(uid)
-		if player == nil {
-			return
-		}
-
-		// player.sender = func(raw *bf.PlayerMsg) error {
-		// 	wrap := &msg.BattleMessageWrap{
-		// 		BattleId: d.GetID(),
-		// 		Head:     raw.Head,
-		// 		Body:     raw.Body,
-		// 	}
-		// return s.SendAsync(player.Uid, wrap)
-		// }
-
-		player.status = battle.PlayerStatus_Joined
-		d.onPlayerStatusChange(player, battle.PlayerStatus_Joined)
-	})
-}
-
-func (d *Table) OnPlayerQuit(uid uint32) {
-	d.PushAction(func() {
-		player := d.GetPlayer(uid)
-		if player == nil {
-			return
-		}
-		player.status = battle.PlayerStatus_Quit
-		player.sender = nil
-		d.onPlayerStatusChange(player, 2)
-	})
+func (d *Table) GetPlayers() map[uint32]*Player {
+	d.rwlock.RLock()
+	defer d.rwlock.RUnlock()
+	return d.players
 }
 
 func (d *Table) OnPlayerDisconn(uid uint32) {
@@ -300,12 +241,13 @@ func (d *Table) OnPlayerDisconn(uid uint32) {
 		if player == nil {
 			return
 		}
-		player.status = battle.PlayerStatus_Disconn
-		d.onPlayerStatusChange(player, 3)
+		player.send2client = nil
+		d.onPlayerStatusChange(player, battle.PlayerStatus_Disconn)
 	})
 }
 
 func (d *Table) onPlayerStatusChange(p *Player, currstat battle.PlayerStatusType) {
+	p.status = currstat
 	d.logic.OnPlayerStatus(p, currstat)
 }
 
@@ -329,11 +271,104 @@ func (d *Table) PublishEvent(event proto.Message) {
 	// d.EventPublisher.Publish(warp)
 }
 
-func (d *Table) OnPlayerMessage(uid uint32, p *bf.PlayerMsg) {
-	d.action <- func() {
-		player := d.GetPlayer(uid)
-		if player != nil && d.logic != nil {
-			d.logic.OnPlayerMessage(player, p)
+func (d *Table) StartGame() {
+	ok := atomic.CompareAndSwapInt32(&d.status, battle.GameStatus_Idle, battle.GameStatus_Starting)
+	if !ok {
+		return
+	}
+
+	if d.logic != nil {
+		d.logic.OnStart()
+	}
+
+	d.OverDeadline = time.Now().Add(time.Duration(d.TableOption.Conf.MaxBattleTime) * time.Second)
+}
+
+func (d *Table) CloseGame() {
+	ok := atomic.CompareAndSwapInt32(&d.status, battle.GameStatus_Started, battle.GameStatus_Closing)
+	if !ok {
+		return
+	}
+	if d.logic != nil {
+		d.logic.OnClose()
+	}
+}
+
+func (d *Table) ReportGameTally(tally *battle.TallyInfo) {
+
+}
+
+func (d *Table) ReportGameStarted() {
+	if ok := d.UpdateStatus(battle.GameStatus_Started); !ok {
+		return
+	}
+	d.StartAt = time.Now()
+	d.PublishEvent(&msg.EventBattleStarted{})
+}
+
+func (d *Table) ReportGameOver() {
+	if ok := d.UpdateStatus(battle.GameStatus_Over); !ok {
+		return
+	}
+	d.OverAt = time.Now()
+	d.PublishEvent(&msg.EventBattleOver{})
+
+	d.close()
+}
+
+func (d *Table) OnBattleMessageWrap(u battle.User, p *msg.BattleMessageWrap) {
+	d.chAction <- func() {
+		player := d.GetPlayer(u.UId())
+		if player == nil || d.logic == nil {
+			return
+		}
+		switch payload := p.Payload.(type) {
+		case *msg.BattleMessageWrap_ReqJoin:
+			player.send2client = func(raw *battle.PlayerMsg) error {
+				return u.Send(&msg.BattleMessageWrap{
+					Battleid: d.ID,
+					Payload: &msg.BattleMessageWrap_ToClient{
+						ToClient: &msg.MsgToClient{
+							Msgid: raw.Msgid,
+							Body:  raw.Body,
+						}},
+				})
+			}
+
+			d.onPlayerStatusChange(player, battle.PlayerStatus_Joined)
+
+			if d.GetStatus() == battle.GameStatus_Idle {
+				unjoinedCnt := 0
+				for _, p := range d.players {
+					if p.GetStatus() == battle.PlayerStatus_Unjoin {
+						unjoinedCnt++
+					}
+				}
+
+				if unjoinedCnt == 0 {
+					d.StartGame()
+				}
+			}
+			u.Send(&msg.BattleMessageWrap{
+				Battleid: d.ID,
+				Payload:  &msg.BattleMessageWrap_RespJoin{},
+			})
+		case *msg.BattleMessageWrap_ReqQuit:
+			player.send2client = nil
+			d.onPlayerStatusChange(player, battle.PlayerStatus_Quit)
+
+			u.Send(&msg.BattleMessageWrap{
+				Battleid: d.ID,
+				Payload:  &msg.BattleMessageWrap_RespQuit{},
+			})
+		case *msg.BattleMessageWrap_ToLogic:
+			if d.logic == nil {
+				return
+			}
+			d.logic.OnPlayerMessage(player, &battle.PlayerMsg{
+				Msgid: payload.ToLogic.Msgid,
+				Body:  payload.ToLogic.Body,
+			})
 		}
 	}
 }
